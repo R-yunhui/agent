@@ -1,0 +1,13 @@
+# langchain v1.0
+langchain==1.0.3
+langchain-core==1.0.3
+langchain_community==1.0.0a1
+
+# langchain openai
+langchain-openai==1.0.2
+
+# 环境变量管理（用于保存API密钥）
+python-dotenv==1.0.1
+
+# 请求
+requests<3.0.0,>=2.32.5
