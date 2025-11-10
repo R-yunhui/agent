@@ -6,6 +6,11 @@ langchain_community==1.0.0a1
 # langchain openai
 langchain-openai==1.0.2
 
+# rag相关
+pymilvus==2.6.3
+langchain-text-splitters==1.0.0
+langchain-milvus==0.2.2
+
 # 环境变量管理（用于保存API密钥）
 python-dotenv==1.0.1
 
