@@ -4,6 +4,7 @@ from langchain_core.runnables import RunnableConfig, RunnableWithMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.embeddings import Embeddings
+from langchain_core.documents import Document
 from langchain_openai.embeddings import OpenAIEmbeddings
 from pymilvus import connections, db
 from langchain_milvus import Milvus
@@ -201,6 +202,7 @@ def rag_execute_with_file(path: str, session_id: str) -> Milvus:
         separators=["\n\n", "\n", "。", "！", "？", "；", ".", "!", "?", ";", " ", ""],
     )
 
+    # 步骤 1：准备分块的文本
     split_documents = []
     for doc in documents:
         splits = text_splitter.split_text(doc)
@@ -209,20 +211,23 @@ def rag_execute_with_file(path: str, session_id: str) -> Milvus:
     print(f"文档分割后共 {len(split_documents)} 个文本块")
 
     # langchain 内部会自己创建和管理 milvus 连接
-    # from_texts 会自动完成：文本 -> 向量化 -> 存储
-    embeddings = get_embedding_model()
+    # add_documents 会自动完成：文本 -> 向量化 -> 存储
     try:
-        vectorstore = Milvus.from_texts(
-            texts=split_documents,
-            embedding=embeddings,
-            collection_name=config["milvus"]["collection_name"],
-            connection_args={
-                **connection_args,
-                "db_name": config["milvus"]["db_name"],
-            },
-            drop_old=True  # 如果集合存在则删除，重新创建
-        )
+        vectorstore = create_vector_store()
+        # 步骤 2：转换为 Document，添加自定义字段（列表推导式，简洁创建列表的方式）
+        documents = [
+            Document(
+                page_content=text,
+                metadata={
+                    "source": "local",
+                    "category": "language",
+                    "session_id": session_id,
+                }
+            )
+            for text in split_documents
+        ]
 
+        vectorstore.add_documents(documents=documents)
         print(f"✅ 成功存储 {len(split_documents)} 个文档块到向量数据库")
 
     except Exception as e:
@@ -248,13 +253,42 @@ def create_vector_store() -> Milvus:
             raise ConnectionError("Milvus 数据库不存在")
 
         # langchain 内部默认会进行 milvus 的连接
+        """
+        "IP"  # 内积，分数越大越相似
+        "COSINE"  # 余弦，分数越大越相似
+        "L2"  # 欧氏距离，分数越小越相似（容易混淆）
+        
+        # COSINE 分数范围：-1 ~ 1
+        # 1 = 完全相同
+        # 0 = 正交（无关）
+        # -1 = 完全相反
+        
+        auto_id=True   ← Milvus 自动生成 ID（0, 1, 2, ...）
+                 优点：简单，无需管理
+                 缺点：无法追踪原始文档
+
+        auto_id=False  ← 需要手动提供 ID
+                 优点：可以追踪文档来源
+                 缺点：需要手动管理
+        """
         vectorstore = Milvus(
             collection_name=config["milvus"]["collection_name"],
             connection_args={
                 **connection_args,
                 "db_name": db_name,
             },
+            auto_id=True,  # 测试使用
             embedding_function=get_embedding_model(),
+            index_params={
+                "index_type": "IVF_FLAT",
+                "metric_type": "COSINE",  # 余弦距离
+                "params": {"nlist": 128}
+            },
+            search_params={
+                "metric_type": "COSINE",
+                "params": {"nprobe": 16}
+            },
+            drop_old=False,
         )
 
         return vectorstore
