@@ -59,6 +59,14 @@ def chat_with_memory(user_question: str, session_id: str) -> ABCIterator:
             k=config["rag"]["retrieval_top_k"],
         )
 
+        if vectorstore_results:
+            for doc, score in vectorstore_results:
+                print(f"检索到的文档相似度：{score:.4f}")
+
+        # 过滤分数低于 similarity_threshold 的
+        vectorstore_results = list(filter(lambda vectorstore_result: vectorstore_result[1] >= config["rag"]["similarity_threshold"], vectorstore_results))
+        print(f"过滤分数低于 {config['rag']['similarity_threshold']} 后的文档数量: {len(vectorstore_results)}")
+
         message_history = create_chat_with_memory()
 
         if vectorstore_results is None or len(vectorstore_results) == 0:
