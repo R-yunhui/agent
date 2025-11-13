@@ -18,7 +18,7 @@ load_dotenv()
 # ========== LLM 配置 ==========
 class LLMConfig:
     """大语言模型配置"""
-    API_BASE = os.getenv("OPENAI_API_BASE", "http://192.168.2.54:9015/v1")
+    API_BASE = os.getenv("OPENAI_API_BASE", "http://192.168.2.59:8000/v1")
     API_KEY = os.getenv("OPENAI_API_KEY", None)
     MODEL = os.getenv("OPENAI_MODEL", "qwen2.5-vl-72b-instruct")
     TEMPERATURE = 0.3
@@ -29,7 +29,7 @@ class LLMConfig:
 class EmbeddingConfig:
     """向量化模型配置"""
     # OpenAI Embedding 配置
-    API_BASE = os.getenv("OPENAI_API_BASE", "http://192.168.2.54:9015/v1/")
+    API_BASE = os.getenv("OPENAI_API_BASE", "http://192.168.2.59:8000/v1/")
     API_KEY = os.getenv("OPENAI_API_KEY", None)
     MODEL = os.getenv("EMBEDDING_MODEL", "multimodal-embedding")
 

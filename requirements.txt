@@ -1,10 +1,13 @@
 # langchain v1.0
 langchain==1.0.3
 langchain-core==1.0.3
-langchain_community==1.0.0a1
+langchain_community==0.4.1
 
 # langchain openai
 langchain-openai==1.0.2
+
+# 阿里云百炼大模型
+dashscope==1.25.1
 
 # rag相关
 pymilvus==2.6.3

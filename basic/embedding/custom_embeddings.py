@@ -4,7 +4,7 @@
 适配非标准 OpenAI 格式的 Embedding API
 API 格式示例：
 {
-    "model": "multimodal-embedding-v1",
+    "model": "multimodal-embedding-7b",
     "input": {
         "contents": [
             {"text": "文本1"},
@@ -81,7 +81,7 @@ class CustomMultimodalEmbeddings(Embeddings):
         embeddings = CustomMultimodalEmbeddings(
             api_base="http://192.168.2.54:9015/v1",
             api_key="your-key",
-            model="multimodal-embedding-v1"
+            model="multimodal-embedding-7b"
         )
         
         # 向量化单个文本
@@ -95,7 +95,7 @@ class CustomMultimodalEmbeddings(Embeddings):
             self,
             api_base: str,
             api_key: str = None,
-            model: str = "multimodal-embedding-v1",
+            model: str = "multimodal-embedding-7b",
             max_retries: int = 3,
             timeout: int = 60,
             batch_size: int = 10  # 每批处理的文本数量

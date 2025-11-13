@@ -33,7 +33,7 @@ def call_api(prompt, options, context):
 
 
 def call_llm(prompt):
-    url = "http://192.168.2.54:9015/v1/chat/completions"
+    url = "http://192.168.2.59:8000/v1/chat/completions"
 
     headers = {
         "Authorization": "Bearer 738e8958225caf2514f163e3f91a6381",

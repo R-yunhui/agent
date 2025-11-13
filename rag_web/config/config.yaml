@@ -14,7 +14,7 @@ app:
 llm:
   # OpenAI API 配置（也支持兼容的 API，如 DeepSeek、智谱等）
   api_key: "93e5f02e99061db3b6113e8db46a0fbd"  # 请替换为你的实际 API Key
-  base_url: "http://192.168.2.54:9015/v1"  # API 端点地址
+  base_url: "http://192.168.2.59:8000/v1"  # API 端点地址
   model: "qwen2.5-vl-72b-instruct"  # 模型名称
   temperature: 0.7  # 温度参数，控制随机性（0-2）
   max_tokens: 2000  # 最大生成 token 数
@@ -22,9 +22,9 @@ llm:
 
 # Embedding 模型配置
 embedding:
-  api_base: "http://192.168.2.54:9015/v1"  # Embedding API 端点
+  api_base: "http://192.168.2.59:8000/v1"  # Embedding API 端点
   api_key: "93e5f02e99061db3b6113e8db46a0fbd"  # API Key
-  model: "multimodal-embedding-v1"  # Embedding 模型名称
+  model: "multimodal-embedding-7b"  # Embedding 模型名称
   batch_size: 5  # 批处理大小
 
 # Milvus 向量数据库配置
