@@ -14,7 +14,7 @@ llm:
   # OpenAI API 配置（也支持兼容的 API，如 DeepSeek、智谱等）
   api_key: "93e5f02e99061db3b6113e8db46a0fbd"  # 请替换为你的实际 API Key
   base_url: "http://192.168.2.59:8000/v1/"  # API 端点地址
-  model: "qwen2.5-vl-72b-instruct"  # 模型名称
+  model: "qwen3-vl-32b-instruct"  # 模型名称
   temperature: 0.7  # 温度参数，控制随机性（0-2）
   max_tokens: 2000  # 最大生成 token 数
   streaming: true  # 是否启用流式响应

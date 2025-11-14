@@ -48,7 +48,7 @@ def call_llm(prompt):
                 "role": "user"
             }
         ],
-        "model": "qwen2.5-vl-72b-instruct",
+        "model": "qwen3-vl-32b-instruct",
         "max_tokens": 8000,
         "stream": False,
         "temperature": 0.1,

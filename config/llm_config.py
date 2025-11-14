@@ -20,7 +20,7 @@ class LLMConfig:
     """大语言模型配置"""
     API_BASE = os.getenv("OPENAI_API_BASE", "http://192.168.2.59:8000/v1")
     API_KEY = os.getenv("OPENAI_API_KEY", None)
-    MODEL = os.getenv("OPENAI_MODEL", "qwen2.5-vl-72b-instruct")
+    MODEL = os.getenv("OPENAI_MODEL", "qwen3-vl-32b-instruct")
     TEMPERATURE = 0.3
     MAX_TOKENS = 2000
 
