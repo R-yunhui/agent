@@ -45,4 +45,8 @@ numpy==2.2.6
 # yaml 解析
 pyyaml==6.0.3
 
+# fake 数据
+faker==38.0.0
 
+# 处理结构化数据
+pandas==2.3.3
