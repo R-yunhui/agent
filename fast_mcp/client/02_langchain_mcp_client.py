@@ -1,11 +1,13 @@
 """
 使用 langchain mcp client 调用 mcp server
 """
+import json
 import os
 import asyncio
 
 from dotenv import load_dotenv
 from langchain_classic.agents import create_tool_calling_agent
+from langchain_community.chat_models import ChatTongyi
 from langchain_core.runnables import RunnableConfig
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain.agents import create_agent
@@ -19,10 +21,9 @@ from typing import Dict
 load_dotenv()
 
 # 大模型 ChatModel
-llm = ChatOpenAI(
-    base_url=os.getenv("OPENAI_API_BASE_URL"),
-    api_key=os.getenv("OPENAI_API_KEY"),
-    model=os.getenv("OPENAI_CHAT_MODEL"),
+llm = ChatTongyi(
+    api_key=os.getenv("DASHSCOPE_KEY"),
+    model=os.getenv("TONGYI_CHAT_MODEL"),
 )
 
 """
@@ -67,7 +68,9 @@ async def main(user_question: str, thread_id: str):
             )
         )
 
-        print(response["messages"][-1].content)
+        print(f"大模型完整消息: {response}")
+
+        print(f"大模型回复: {response['messages'][-1].content}")
     except Exception as e:
         print(f"大模型调用失败: {e}")
 
@@ -92,23 +95,6 @@ def get_or_create_agent():
     return agent
 
 
-def get_history(thread_id: str):
-    """
-    获取指定线程的对话历史
-    :param thread_id: 线程 ID
-    :return: 对话历史
-    """
-    global checkpointer
-    if checkpointer:
-        return list(checkpointer.list(
-            config=RunnableConfig(
-                configurable={"thread_id": thread_id}
-            )
-        ))
-
-    return []
-
-
 async def get_mcp_tools():
     mcp_tools = await client.get_tools()
     if mcp_tools:
@@ -121,6 +107,24 @@ async def get_mcp_tools():
         tools.extend(mcp_tools)
 
 
+def get_history(thread_id: str):
+    """
+    获取指定线程的对话历史
+    :param thread_id: 线程 ID
+    :return: 对话历史
+    """
+    global checkpointer
+    if checkpointer:
+        message_list = []
+        checkpoint = checkpointer.get_tuple(config=RunnableConfig(configurable={"thread_id": thread_id}))
+        messages = checkpoint.checkpoint['channel_values']['messages']
+        for msg in messages:
+            print(msg.type, msg.content, end="\n")
+            message_list.append(msg)
+
+    return None
+
+
 if __name__ == "__main__":
     asyncio.run(get_mcp_tools())
     print(f"成功获取工具: {len(tools)} 个")
@@ -129,9 +133,13 @@ if __name__ == "__main__":
     get_or_create_agent()
     print("成功创建智能助手")
     print("=" * 60)
+    chat_id = "001"
     question = input("请输入问题. 输入 exit 或 退出 结束: ")
     while question not in ["exit", "退出"]:
-        asyncio.run(main(question, "001"))
+        if question == '获取对话历史':
+            get_history(chat_id)
+        else:
+            asyncio.run(main(question, chat_id))
         question = input("请输入问题: ")
 
     print("程序结束")

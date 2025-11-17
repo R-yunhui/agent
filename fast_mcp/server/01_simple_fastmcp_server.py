@@ -6,23 +6,13 @@ mcp = FastMCP(
 )
 
 
-@mcp.tool()
+@mcp.tool(description="两数相加, 返回两个数的和")
 def add(a: int, b: int) -> int:
-    """
-    两数相加
-    :param a: 第一个数
-    :param b: 第二个数
-    :return: 两数相加的结果
-    """
     return a + b
 
 
-@mcp.tool()
+@mcp.tool(description="获取当前时间, 格式为 %Y-%m-%d %H:%M:%S")
 def get_current_time() -> str:
-    """
-    获取当前时间
-    :return: 当前时间的字符串表示
-    """
     import datetime
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
