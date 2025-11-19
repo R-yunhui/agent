@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC 音频回声测试</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        button { font-size: 16px; padding: 8px 16px; }
+        #status { margin-top: 20px; font-weight: bold; }
+        audio { margin-top: 15px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>WebRTC 音频回声测试</h1>
+    <p>点击“开始测试”，您的麦克风音频将被发送到服务器，然后服务器会将其传回并在下方播放。</p>
+    <button id="startButton">开始测试</button>
+    <button id="stopButton" disabled>停止测试</button>
+    <div id="status">状态：未连接</div>
+    
+    <h3>从服务器返回的音频：</h3>
+    <audio id="remoteAudio" autoplay controls></audio>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const statusDiv = document.getElementById('status');
+        const remoteAudio = document.getElementById('remoteAudio');
+        
+        let pc; // RTCPeerConnection
+        let localStream;
+
+        startButton.onclick = async () => {
+            startButton.disabled = true;
+            statusDiv.textContent = '状态：正在请求麦克风...';
+
+            try {
+                // 1. 获取麦克风音频流
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+
+                // 2. 创建 RTCPeerConnection
+                pc = new RTCPeerConnection();
+
+                // 3. **【新增】** 设置 ontrack 事件处理器，用于接收远程音频流
+                pc.ontrack = (event) => {
+                    console.log('Received remote track:', event.track);
+                    if (remoteAudio.srcObject !== event.streams[0]) {
+                        remoteAudio.srcObject = event.streams[0];
+                        statusDiv.textContent = '状态：已连接，正在接收并播放回声音频...';
+                    }
+                };
+
+                // 4. 将本地音频轨道添加到连接中，发送给服务器
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+
+                statusDiv.textContent = '状态：正在连接服务器...';
+
+                // 5. 创建 Offer
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                // 6. 将 Offer 发送到后端
+                const response = await fetch('/offer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sdp: pc.localDescription.sdp,
+                        type: pc.localDescription.type,
+                    }),
+                });
+
+                const answer = await response.json();
+                
+                // 7. 设置远端 Answer
+                await pc.setRemoteDescription(new RTCSessionDescription(answer));
+
+                stopButton.disabled = false;
+                // 初始状态只提示正在发送
+                statusDiv.textContent = '状态：已连接，正在发送音频...（等待接收回声）';
+
+            } catch (e) {
+                console.error(e);
+                statusDiv.textContent = `状态：错误 - ${e.message}`;
+                startButton.disabled = false;
+            }
+        };
+
+        stopButton.onclick = () => {
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            remoteAudio.srcObject = null; // 清空播放器
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            statusDiv.textContent = '状态：已断开';
+        };
+    </script>
+</body>
+</html>

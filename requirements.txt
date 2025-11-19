@@ -50,3 +50,9 @@ faker==38.0.0
 
 # 处理结构化数据
 pandas==2.3.3
+
+# 异步 HTTP 客户端/服务器库
+aiohttp==3.13.2
+
+# webrtc 实现了 WebRTC 的x开放标准
+aiortc==1.14.0
