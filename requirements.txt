@@ -56,3 +56,9 @@ aiohttp==3.13.2
 
 # webrtc 实现了 WebRTC 的x开放标准
 aiortc==1.14.0
+
+# psutil 用于获取系统信息
+psutil==7.1.3
+
+# mem 框架，用于大模型记忆管理
+mem0ai==1.0.1
