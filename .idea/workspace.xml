@@ -5,7 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c9a1a8e8-ef15-4211-87bb-a7a65f03f335" name="Changes" comment="feat：mem0 库简单学习">
-      <change beforePath="$PROJECT_DIR$/mem/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/mem/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -31,47 +31,47 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.01_concurrent_basic.executor": "Run",
-    "Python.01_hello_word.executor": "Debug",
-    "Python.01_mem0_basic (1).executor": "Run",
-    "Python.01_mem0_basic.executor": "Run",
-    "Python.01_qwen_basic (1).executor": "Run",
-    "Python.01_qwen_basic.executor": "Debug",
-    "Python.01_simple_fastmcp_client.executor": "Run",
-    "Python.01_simple_fastmcp_server.executor": "Run",
-    "Python.02_langchain_mcp_client.executor": "Run",
-    "Python.02_mem0_langchain_integration.executor": "Debug",
-    "Python.02_web_basic.executor": "Run",
-    "Python.03_event_basic.executor": "Run",
-    "Python.03_rag_basic.executor": "Run",
-    "Python.04_opencv_basic.executor": "Run",
-    "Python.06_web_stream.executor": "Run",
-    "Python.custom_embeddings.executor": "Run",
-    "Python.fake_data.executor": "Run",
-    "Python.provider.executor": "Run",
-    "Python.psutil_basic.executor": "Run",
-    "Python.rag_agent.executor": "Run",
-    "Python.rag_chat.executor": "Run",
-    "Python.rag_execute (1).executor": "Run",
-    "Python.rag_execute.executor": "Run",
-    "Python.server.executor": "Run",
-    "Python.weblfasr_python3_demo.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "D:/ryh/personal/python/agent/web_rtc",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "com.android.studio.ml.templates",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.01_concurrent_basic.executor&quot;: &quot;Run&quot;,
+    &quot;Python.01_hello_word.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.01_mem0_basic (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.01_mem0_basic.executor&quot;: &quot;Run&quot;,
+    &quot;Python.01_qwen_basic (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.01_qwen_basic.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.01_simple_fastmcp_client.executor&quot;: &quot;Run&quot;,
+    &quot;Python.01_simple_fastmcp_server.executor&quot;: &quot;Run&quot;,
+    &quot;Python.02_langchain_mcp_client.executor&quot;: &quot;Run&quot;,
+    &quot;Python.02_mem0_langchain_integration.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.02_web_basic.executor&quot;: &quot;Run&quot;,
+    &quot;Python.03_event_basic.executor&quot;: &quot;Run&quot;,
+    &quot;Python.03_rag_basic.executor&quot;: &quot;Run&quot;,
+    &quot;Python.04_opencv_basic.executor&quot;: &quot;Run&quot;,
+    &quot;Python.06_web_stream.executor&quot;: &quot;Run&quot;,
+    &quot;Python.custom_embeddings.executor&quot;: &quot;Run&quot;,
+    &quot;Python.fake_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.provider.executor&quot;: &quot;Run&quot;,
+    &quot;Python.psutil_basic.executor&quot;: &quot;Run&quot;,
+    &quot;Python.rag_agent.executor&quot;: &quot;Run&quot;,
+    &quot;Python.rag_chat.executor&quot;: &quot;Run&quot;,
+    &quot;Python.rag_execute (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.rag_execute.executor&quot;: &quot;Run&quot;,
+    &quot;Python.server.executor&quot;: &quot;Run&quot;,
+    &quot;Python.weblfasr_python3_demo.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/ryh/personal/python/agent/web_rtc&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.android.studio.ml.templates&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\ryh\personal\python\agent\web_rtc" />
@@ -258,7 +258,8 @@
       <workItem from="1763452261868" duration="5827000" />
       <workItem from="1763515812188" duration="6471000" />
       <workItem from="1763531962267" duration="2713000" />
-      <workItem from="1763535615332" duration="7429000" />
+      <workItem from="1763535615332" duration="8077000" />
+      <workItem from="1763623195666" duration="592000" />
     </task>
     <task id="LOCAL-00001" summary="feat：提交v1.0 版本的 langchain">
       <option name="closed" value="true" />
@@ -364,7 +365,15 @@
       <option name="project" value="LOCAL" />
       <updated>1763540648116</updated>
     </task>
-    <option name="localTasksCounter" value="14" />
+    <task id="LOCAL-00014" summary="feat：mem0 库简单学习">
+      <option name="closed" value="true" />
+      <created>1763547180462</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1763547180462</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
