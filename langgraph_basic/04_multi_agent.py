@@ -4,6 +4,7 @@ LangGraph 基础示例4：多Agent协作
 """
 import os
 from typing import TypedDict, Annotated, Literal
+from langgraph.typing import StateT
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
@@ -15,7 +16,7 @@ load_dotenv()
 
 
 # 1. 定义状态
-class MultiAgentState(TypedDict):
+class MultiAgentState(StateT):
     """多Agent状态"""
     task: str  # 用户任务
     research_result: str  # 研究结果
