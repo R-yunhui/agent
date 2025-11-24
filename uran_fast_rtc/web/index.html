@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uran FastRTC 录制器</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-color: #6366f1;
+            --primary-hover: #4f46e5;
+            --danger-color: #ef4444;
+            --danger-hover: #dc2626;
+            --warning-color: #f59e0b;
+            --warning-hover: #d97706;
+            --text-color: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-weight: 600;
+            margin-bottom: 40px;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2.5rem;
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+            width: 100%;
+        }
+
+        .video-card {
+            background: var(--surface-color);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            position: relative;
+            aspect-ratio: 16/9;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .video-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background: #000;
+        }
+
+        .label {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: white;
+            z-index: 10;
+        }
+
+        .controls-container {
+            background: var(--surface-color);
+            padding: 24px;
+            border-radius: var(--border-radius);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:disabled {
+            background-color: #374151;
+            color: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        button:not(:disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        button:not(:disabled):active {
+            transform: translateY(0);
+        }
+
+        #btn-start {
+            background-color: var(--primary-color);
+        }
+
+        #btn-start:not(:disabled):hover {
+            background-color: var(--primary-hover);
+        }
+
+        #btn-record {
+            background-color: var(--danger-color);
+        }
+
+        #btn-record:not(:disabled):hover {
+            background-color: var(--danger-hover);
+        }
+
+        #btn-stop {
+            background-color: var(--warning-color);
+        }
+
+        #btn-stop:not(:disabled):hover {
+            background-color: var(--warning-hover);
+        }
+
+        #btn-capture {
+            background-color: #10b981;
+        }
+
+        #btn-capture:not(:disabled):hover {
+            background-color: #059669;
+        }
+
+        #btn-stop-capture {
+            background-color: #8b5cf6;
+        }
+
+        #btn-stop-capture:not(:disabled):hover {
+            background-color: #7c3aed;
+        }
+
+        #btn-record-video {
+            background-color: #ec4899;
+        }
+
+        #btn-record-video:not(:disabled):hover {
+            background-color: #db2777;
+        }
+
+        #btn-stop-record-video {
+            background-color: #f97316;
+        }
+
+        #btn-stop-record-video:not(:disabled):hover {
+            background-color: #ea580c;
+        }
+
+        #btn-disconnect {
+            background-color: #64748b;
+        }
+
+        #btn-disconnect:not(:disabled):hover {
+            background-color: #475569;
+        }
+
+        #status {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .file-list-container {
+            background: var(--surface-color);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 100%;
+        }
+
+        .file-list-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-color);
+        }
+
+        .file-list {
+            max-height: 200px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .file-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .file-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        .file-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        .file-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .file-item {
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-item-icon {
+            flex-shrink: 0;
+        }
+
+        .file-item-text {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .video-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Uran FastRTC 录制器</h1>
+
+    <div class="main-container">
+        <div class="video-grid">
+            <div class="video-card">
+                <div class="label">本地视频</div>
+                <video id="local-video" autoplay playsinline muted></video>
+            </div>
+            <div class="video-card">
+                <div class="label">远程视频 (回声/回放)</div>
+                <video id="remote-video" autoplay playsinline></video>
+            </div>
+        </div>
+
+        <div class="controls-container">
+            <div class="button-group">
+                <button id="btn-start" onclick="startConnection()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    开始连接
+                </button>
+                <button id="btn-record" onclick="startRecording()" disabled>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z">
+                        </path>
+                    </svg>
+                    开始录制
+                </button>
+                <button id="btn-stop" onclick="stopRecording()" disabled>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+                    </svg>
+                    停止录制
+                </button>
+                <button id="btn-capture" onclick="startFrameCapture()" disabled>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z">
+                        </path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    开始抽帧
+                </button>
+                <button id="btn-stop-capture" onclick="stopFrameCapture()" disabled>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+                    </svg>
+                    停止抽帧
+                </button>
+                <button id="btn-record-video" onclick="startVideoRecording()" disabled>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z">
+                        </path>
+                    </svg>
+                    录制视频
+                </button>
+                <button id="btn-stop-record-video" onclick="stopVideoRecording()" disabled>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+                    </svg>
+                    停止录制视频
+                </button>
+                <button id="btn-disconnect" onclick="disconnectConnection()" disabled>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                    关闭连接
+                </button>
+            </div>
+            <div id="status">准备连接...</div>
+        </div>
+
+        <div class="file-list-container">
+            <div class="file-list-title">📁 已保存文件</div>
+            <div class="file-list" id="file-list">
+                <div class="empty-state">暂无文件</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let peerConnection;
+        let dataChannel;
+        const localVideo = document.getElementById('local-video');
+        const remoteVideo = document.getElementById('remote-video');
+        const btnStart = document.getElementById('btn-start');
+        const btnRecord = document.getElementById('btn-record');
+        const btnStop = document.getElementById('btn-stop');
+        const btnCapture = document.getElementById('btn-capture');
+        const btnStopCapture = document.getElementById('btn-stop-capture');
+        const btnRecordVideo = document.getElementById('btn-record-video');
+        const btnStopRecordVideo = document.getElementById('btn-stop-record-video');
+        const btnDisconnect = document.getElementById('btn-disconnect');
+        const statusDiv = document.getElementById('status');
+        const fileListDiv = document.getElementById('file-list');
+
+        let frameSavedCount = 0;
+        let savedFiles = [];
+
+        function updateStatus(msg) {
+            statusDiv.textContent = msg;
+            console.log(msg);
+        }
+
+        function addFileToList(filename, type) {
+            savedFiles.unshift({ filename, type, timestamp: new Date() });
+            if (savedFiles.length > 20) {
+                savedFiles = savedFiles.slice(0, 20);
+            }
+            renderFileList();
+        }
+
+        function renderFileList() {
+            if (savedFiles.length === 0) {
+                fileListDiv.innerHTML = '<div class="empty-state">暂无文件</div>';
+                return;
+            }
+
+            const icons = {
+                'audio': '🎵',
+                'image': '🖼️',
+                'video': '🎬'
+            };
+
+            fileListDiv.innerHTML = savedFiles.map(file => `
+                <div class="file-item">
+                    <span class="file-item-icon">${icons[file.type] || '📄'}</span>
+                    <span class="file-item-text" title="${file.filename}">${file.filename}</span>
+                </div>
+            `).join('');
+        }
+
+        async function startConnection() {
+            btnStart.disabled = true;
+            updateStatus("正在建立 WebRTC 连接...");
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280, max: 1920 },
+                        height: { ideal: 720, max: 1080 },
+                        frameRate: { ideal: 30, max: 30 }
+                    },
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+                localVideo.srcObject = stream;
+
+                const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+                peerConnection = new RTCPeerConnection(config);
+
+                stream.getTracks().forEach(track => {
+                    const sender = peerConnection.addTrack(track, stream);
+
+                    if (track.kind === 'video') {
+                        const parameters = sender.getParameters();
+                        if (!parameters.encodings) {
+                            parameters.encodings = [{}];
+                        }
+
+                        parameters.encodings[0].maxBitrate = 2500000;
+                        parameters.encodings[0].maxFramerate = 30;
+                        parameters.encodings[0].scaleResolutionDownBy = 1.0;
+
+                        sender.setParameters(parameters).catch(e => {
+                            console.warn('设置编码参数失败:', e);
+                        });
+                    }
+                });
+
+                peerConnection.ontrack = (event) => {
+                    updateStatus("收到远程轨道");
+                    if (remoteVideo.srcObject !== event.streams[0]) {
+                        remoteVideo.srcObject = event.streams[0];
+                    }
+                };
+
+                dataChannel = peerConnection.createDataChannel("control");
+                dataChannel.onopen = () => {
+                    updateStatus("数据通道已打开。准备录制和抽帧。");
+                    btnRecord.disabled = false;
+                    btnCapture.disabled = false;
+                    btnRecordVideo.disabled = false;
+                    btnDisconnect.disabled = false;
+                };
+
+                dataChannel.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'status') {
+                        updateStatus("服务端: " + data.message);
+                    } else if (data.type === 'saved') {
+                        updateStatus("已保存: " + data.path);
+                        if (data.filename) {
+                            addFileToList(data.filename, 'audio');
+                        }
+                    } else if (data.type === 'frame_capture_status') {
+                        updateStatus("抽帧: " + data.message);
+                    } else if (data.type === 'frame_saved') {
+                        frameSavedCount = data.count;
+                        updateStatus(`抽帧进行中... 已保存 ${frameSavedCount} 帧 (${data.resolution})`);
+                        if (data.filename) {
+                            addFileToList(data.filename, 'image');
+                        }
+                    } else if (data.type === 'video_recording_status') {
+                        updateStatus("视频录制: " + data.message);
+                        if (data.path && data.filename) {
+                            updateStatus("视频已保存: " + data.path);
+                            addFileToList(data.filename, 'video');
+                        }
+                    }
+                };
+
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                const response = await fetch('/uran-fast-rtc/api/webrtc/offer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sdp: peerConnection.localDescription.sdp,
+                        type: peerConnection.localDescription.type,
+                        webrtc_id: crypto.randomUUID()
+                    })
+                });
+
+                const answer = await response.json();
+                await peerConnection.setRemoteDescription(answer);
+                updateStatus("已连接！");
+
+            } catch (err) {
+                console.error(err);
+                updateStatus("错误: " + err.message);
+                btnStart.disabled = false;
+            }
+        }
+
+        function startRecording() {
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(JSON.stringify({ action: "start_record" }));
+                btnRecord.disabled = true;
+                btnStop.disabled = false;
+                updateStatus("正在请求开始录制...");
+            }
+        }
+
+        function stopRecording() {
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(JSON.stringify({ action: "stop_record" }));
+                btnRecord.disabled = false;
+                btnStop.disabled = true;
+                updateStatus("正在请求停止录制...");
+            }
+        }
+
+        function startFrameCapture() {
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(JSON.stringify({ action: "start_frame_capture" }));
+                btnCapture.disabled = true;
+                btnStopCapture.disabled = false;
+                frameSavedCount = 0;
+                updateStatus("正在请求开始抽帧...");
+            }
+        }
+
+        function stopFrameCapture() {
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(JSON.stringify({ action: "stop_frame_capture" }));
+                btnCapture.disabled = false;
+                btnStopCapture.disabled = true;
+                updateStatus("正在请求停止抽帧...");
+            }
+        }
+
+        function startVideoRecording() {
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(JSON.stringify({ action: "start_video_recording" }));
+                btnRecordVideo.disabled = true;
+                btnStopRecordVideo.disabled = false;
+                updateStatus("正在请求开始视频录制...");
+            }
+        }
+
+        function stopVideoRecording() {
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(JSON.stringify({ action: "stop_video_recording" }));
+                btnRecordVideo.disabled = false;
+                btnStopRecordVideo.disabled = true;
+                updateStatus("正在请求停止视频录制...");
+            }
+        }
+
+        function disconnectConnection() {
+            try {
+                if (btnStop.disabled === false) stopRecording();
+                if (btnStopCapture.disabled === false) stopFrameCapture();
+                if (btnStopRecordVideo.disabled === false) stopVideoRecording();
+
+                if (dataChannel) {
+                    dataChannel.close();
+                    dataChannel = null;
+                }
+
+                if (peerConnection) {
+                    peerConnection.close();
+                    peerConnection = null;
+                }
+
+                if (localVideo.srcObject) {
+                    localVideo.srcObject.getTracks().forEach(track => track.stop());
+                    localVideo.srcObject = null;
+                }
+
+                if (remoteVideo.srcObject) {
+                    remoteVideo.srcObject = null;
+                }
+
+                btnStart.disabled = false;
+                btnRecord.disabled = true;
+                btnStop.disabled = true;
+                btnCapture.disabled = true;
+                btnStopCapture.disabled = true;
+                btnRecordVideo.disabled = true;
+                btnStopRecordVideo.disabled = true;
+                btnDisconnect.disabled = true;
+
+                updateStatus("连接已关闭");
+            } catch (err) {
+                console.error('关闭连接时出错:', err);
+                updateStatus("关闭连接失败: " + err.message);
+            }
+        }
+    </script>
+</body>
+
+</html>
