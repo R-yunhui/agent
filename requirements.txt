@@ -69,3 +69,6 @@ fastrtc==0.0.33
 # soundfile 用于音频文件读写
 soundfile>=0.12.0
 
+# websockets
+websockets==15.0.1
+
