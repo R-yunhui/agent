@@ -31,7 +31,9 @@ from constants import (
     VideoCodec,
     VideoConstants,
     AudioConstants,
+    AsyncTaskConstants,
 )
+
 from config import (
     record_audio_dir_path,
     video_frames_dir_path,
@@ -80,6 +82,35 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
         self.video_recording_path: Optional[str] = None
         self.recorded_video_frames = 0
 
+        # ============ 异步任务架构 ============
+
+        # 视频录制异步队列和任务
+        self.video_recording_queue = asyncio.Queue(
+            maxsize=AsyncTaskConstants.VIDEO_RECORDING_QUEUE_SIZE
+        )
+        self.video_recording_worker_task: Optional[asyncio.Task] = None
+
+        # 音频录制异步队列和任务
+        self.audio_recording_queue = asyncio.Queue(
+            maxsize=AsyncTaskConstants.AUDIO_RECORDING_QUEUE_SIZE
+        )
+        self.audio_recording_worker_task: Optional[asyncio.Task] = None
+
+        # 抽帧保存异步队列和任务
+        self.frame_save_queue = asyncio.Queue(
+            maxsize=AsyncTaskConstants.FRAME_SAVE_QUEUE_SIZE
+        )
+        self.frame_save_worker_task: Optional[asyncio.Task] = None
+
+        # 性能统计
+        self.stats = {
+            "video_dropped_frames": 0,
+            "audio_dropped_frames": 0,
+            "frame_save_dropped": 0,
+            "video_queue_max_size": 0,
+            "audio_queue_max_size": 0,
+        }
+
         # 测试数据存储（用于 set_input 测试）
         self.input_data = {}  # 存储通过 set_input 传递的测试数据
 
@@ -108,14 +139,77 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
 
         # 停止视频录制
         if self.video_recording_enabled:
-            self.stop_video_recording()
+            await self._stop_video_recording_async()
+
+        # 停止音频录制
+        if self.mode == StreamMode.RECORDING:
+            await self._stop_audio_recording_async()
+
+        # 等待所有异步任务完成
+        await self._shutdown_async_workers()
 
         # 记录统计信息
         logger.info(
             f"[连接 {self.connection_id}] 统计：总接收视频帧 {self.total_frames_received} 帧，"
             f"抽帧保存 {self.frame_count} 帧，视频录制 {self.recorded_video_frames} 帧"
         )
+        logger.info(
+            f"[连接 {self.connection_id}] 性能统计："
+            f"视频丢帧 {self.stats['video_dropped_frames']}，"
+            f"音频丢帧 {self.stats['audio_dropped_frames']}，"
+            f"抽帧丢弃 {self.stats['frame_save_dropped']}"
+        )
         logger.info(f"[连接 {self.connection_id}] 连接已关闭")
+
+    async def _shutdown_async_workers(self):
+        """优雅关闭所有异步工作任务"""
+        from constants import AsyncTaskConstants
+
+        tasks_to_cancel = []
+
+        # 收集需要取消的任务
+        if self.video_recording_worker_task:
+            tasks_to_cancel.append(("视频录制", self.video_recording_worker_task))
+        if self.audio_recording_worker_task:
+            tasks_to_cancel.append(("音频录制", self.audio_recording_worker_task))
+        if self.frame_save_worker_task:
+            tasks_to_cancel.append(("抽帧保存", self.frame_save_worker_task))
+
+        # 等待队列清空（带超时）
+        start_time = time.time()
+        while time.time() - start_time < AsyncTaskConstants.SHUTDOWN_WAIT_TIMEOUT:
+            all_empty = (
+                self.video_recording_queue.empty()
+                and self.audio_recording_queue.empty()
+                and self.frame_save_queue.empty()
+            )
+            # 回放逻辑
+            if self.replay_index < len(self.recorded_audio_frames):
+                audio_data = self.recorded_audio_frames[self.replay_index]
+                self.replay_index += 1
+
+                # 排空实时队列以防止堆积，但不发送它
+                while not self.audio_queue.empty():
+                    try:
+                        self.audio_queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+
+                return (self.sample_rate, audio_data)
+            else:
+                # 回放结束
+                logger.info(f"回放结束，切换回 {StreamMode.LIVE.description} 模式")
+                self.mode = StreamMode.LIVE
+                self.replay_index = 0
+                if self.channel:
+                    self.channel.send(
+                        json.dumps(
+                            {"type": MessageType.STATUS.value, "message": "回放结束"}
+                        )
+                    )
+
+        # LIVE 或 RECORDING 模式：回声实时音频
+        return await wait_for_item(self.audio_queue)
 
     def set_args(self, args: list):
         """
@@ -172,8 +266,11 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
 
         if self.video_resolution != new_resolution:
             if self.video_resolution is None:
+                # 首次接收视频帧，打印详细信息用于调试颜色问题
+                channels = frame.shape[2] if len(frame.shape) > 2 else 1
                 logger.info(
-                    f"[连接 {self.connection_id}] 视频流已建立，分辨率: {width}x{height}"
+                    f"[连接 {self.connection_id}] 视频流已建立，分辨率: {width}x{height}, "
+                    f"通道数: {channels}, dtype: {frame.dtype}, 颜色范围: [{frame.min()}, {frame.max()}]"
                 )
             else:
                 logger.warning(
@@ -186,21 +283,42 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
         if self.frame_capture_enabled:
             self.latest_video_frame = frame.copy()
 
-        # 如果视频录制已启用，写入视频文件
-        if self.video_recording_enabled and self.video_writer is not None:
+        # ============ 异步视频录制 ============
+        # 如果视频录制已启用，将帧放入队列（非阻塞）
+        if self.video_recording_enabled:
             try:
-                # OpenCV 需要 BGR 格式，frame 可能是 RGB 或 RGBA
-                if frame.shape[2] == 3:
-                    bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                elif frame.shape[2] == 4:
-                    bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
-                else:
-                    bgr_frame = frame
-
-                self.video_writer.write(bgr_frame)
+                # 使用 put_nowait 避免阻塞主流程
+                self.video_recording_queue.put_nowait(frame.copy())
                 self.recorded_video_frames += 1
-            except Exception as e:
-                logger.error(f"[连接 {self.connection_id}] 写入视频帧失败: {e}")
+
+                # 监控队列大小
+                queue_size = self.video_recording_queue.qsize()
+                self.stats["video_queue_max_size"] = max(
+                    self.stats["video_queue_max_size"], queue_size
+                )
+
+                # 队列使用率警告
+                from constants import AsyncTaskConstants
+
+                usage_rate = queue_size / AsyncTaskConstants.VIDEO_RECORDING_QUEUE_SIZE
+                if usage_rate > AsyncTaskConstants.QUEUE_WARNING_THRESHOLD:
+                    logger.warning(
+                        f"[连接 {self.connection_id}] 视频录制队列使用率较高: {usage_rate:.1%}"
+                    )
+            except asyncio.QueueFull:
+                # 队列满了，丢弃帧并记录
+                self.stats["video_dropped_frames"] += 1
+                from constants import AsyncTaskConstants
+
+                if (
+                    self.stats["video_dropped_frames"]
+                    % AsyncTaskConstants.DROPPED_FRAME_LOG_INTERVAL
+                    == 0
+                ):
+                    logger.warning(
+                        f"[连接 {self.connection_id}] 视频录制队列已满，"
+                        f"已丢弃 {self.stats['video_dropped_frames']} 帧"
+                    )
 
         await self.video_queue.put(frame)
 
@@ -217,11 +335,29 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
         sample_rate, audio_data = frame
         self.sample_rate = sample_rate  # 如果需要，更新采样率
 
+        # ============ 异步音频录制 ============
         if self.mode == StreamMode.RECORDING:
-            # 存储数据副本以进行录制
+            try:
+                # 将音频帧放入异步录制队列
+                self.audio_recording_queue.put_nowait(audio_data.copy())
+
+                # 监控队列
+                queue_size = self.audio_recording_queue.qsize()
+                self.stats["audio_queue_max_size"] = max(
+                    self.stats["audio_queue_max_size"], queue_size
+                )
+            except asyncio.QueueFull:
+                self.stats["audio_dropped_frames"] += 1
+                # 音频丢帧比较严重，可以降低日志频率
+                if self.stats["audio_dropped_frames"] % 100 == 0:
+                    logger.warning(
+                        f"[连接 {self.connection_id}] 音频录制队列已满，丢弃帧"
+                    )
+
+            # 兼容旧逻辑：同时也存入内存列表（为了回放功能）
             self.recorded_audio_frames.append(audio_data.copy())
 
-        # 始终排队进行实时回声（除非我们想在回放期间静音，在 emit 中处理）
+        # 始终排队进行实时回声
         await self.audio_queue.put(frame)
 
     async def emit(self) -> AudioEmitType:
@@ -267,9 +403,9 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
             action = data.get("action")
 
             if action == MessageType.START_RECORD.value:
-                self.start_recording()
+                self.start_audio_recording()
             elif action == MessageType.STOP_RECORD.value:
-                self.stop_recording()
+                self.stop_audio_recording()
             elif action == MessageType.START_FRAME_CAPTURE.value:
                 self.start_frame_capture()
             elif action == MessageType.STOP_FRAME_CAPTURE.value:
@@ -286,64 +422,95 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
     # 音频录制功能
     # ========================================================================
 
-    def start_recording(self):
+    def start_audio_recording(self):
         logger.info(f"[连接 {self.connection_id}] 开始音频录制")
         self.mode = StreamMode.RECORDING
-        self.recorded_audio_frames = []
+        self.recorded_audio_frames = []  # 仍保留用于回放，但录制文件由worker处理
+
+        # 生成文件名
+        timestamp = int(time.time())
+        filename = f"recording_{timestamp}.wav"
+        filepath = os.path.join(record_audio_dir_path, filename)
+
+        # 启动异步worker任务
+        from handlers.async_workers import AudioRecordingWorker
+
+        self.audio_recording_worker_task = asyncio.create_task(
+            AudioRecordingWorker.run(
+                queue=self.audio_recording_queue,
+                connection_id=self.connection_id,
+                sample_rate=self.sample_rate,
+                filepath=filepath,
+            )
+        )
+
         if self.channel:
             self.channel.send(
                 json.dumps({"type": MessageType.STATUS.value, "message": "录制已开始"})
             )
 
-    def stop_recording(self):
-        logger.info(
-            f"[连接 {self.connection_id}] 停止音频录制 (共录制 {len(self.recorded_audio_frames)} 帧)"
-        )
-        self.mode = StreamMode.REPLAYING  # 停止后直接切换到回放
-        self.replay_index = 0
-
-        # 保存到文件
-        self.save_recording()
-
-        if self.channel:
-            self.channel.send(
-                json.dumps(
-                    {
-                        "type": MessageType.STATUS.value,
-                        "message": "录制已停止，正在保存并回放...",
-                    }
-                )
-            )
-
-    def save_recording(self):
-        if not self.recorded_audio_frames:
-            logger.warning("没有音频帧可保存。")
+    async def _stop_audio_recording_async(self):
+        """异步停止音频录制"""
+        if self.mode != StreamMode.RECORDING:
             return
 
         try:
-            # 连接所有帧
-            full_audio = np.concatenate(self.recorded_audio_frames)
+            # 1. 切换状态停止接收
+            self.mode = StreamMode.REPLAYING
+            self.replay_index = 0
 
-            # 生成带时间戳的文件名
-            filename = f"recording_{int(time.time())}.wav"
-            filepath = os.path.join(record_audio_dir_path, filename)
+            # 2. 等待队列清空
+            from constants import AsyncTaskConstants
 
-            # 保存为 WAV
-            sf.write(filepath, full_audio, self.sample_rate)
-            logger.info(f"录音已保存到 {filepath}")
+            start_time = time.time()
+            while not self.audio_recording_queue.empty():
+                if time.time() - start_time > AsyncTaskConstants.SHUTDOWN_WAIT_TIMEOUT:
+                    logger.warning(
+                        f"[连接 {self.connection_id}] 等待音频录制队列清空超时"
+                    )
+                    break
+                await asyncio.sleep(0.1)
+
+            # 3. 等待worker完成
+            if self.audio_recording_worker_task:
+                try:
+                    # worker会在队列为空且超时后自动结束，或者我们可以cancel它
+                    # 但AudioRecordingWorker设计是读到超时才结束，所以这里可能需要一点时间
+                    # 或者我们可以修改worker支持显式停止信号，但目前利用超时机制
+                    await asyncio.wait_for(
+                        self.audio_recording_worker_task,
+                        timeout=AsyncTaskConstants.QUEUE_GET_TIMEOUT + 2.0,
+                    )
+                except asyncio.TimeoutError:
+                    # 如果超时还没结束，强制取消
+                    self.audio_recording_worker_task.cancel()
+                except Exception as e:
+                    logger.error(f"[连接 {self.connection_id}] 音频worker关闭异常: {e}")
+                self.audio_recording_worker_task = None
+
+            logger.info(
+                f"[连接 {self.connection_id}] 停止音频录制 (内存中保留 {len(self.recorded_audio_frames)} 帧用于回放)"
+            )
 
             if self.channel:
                 self.channel.send(
                     json.dumps(
                         {
-                            "type": MessageType.SAVED.value,
-                            "filename": filename,
-                            "path": filepath,
+                            "type": MessageType.STATUS.value,
+                            "message": "录制已停止，正在回放...",
                         }
                     )
                 )
         except Exception as e:
-            logger.error(f"保存录音时出错: {e}")
+            logger.error(f"[连接 {self.connection_id}] 停止音频录制时出错: {e}")
+
+    def stop_audio_recording(self):
+        logger.info(f"[连接 {self.connection_id}] 收到停止录制请求")
+        if self.mode != StreamMode.RECORDING:
+            return
+
+        # 启动后台任务停止录制
+        asyncio.create_task(self._stop_audio_recording_async())
 
     # ========================================================================
     # 视频抽帧功能
@@ -377,7 +544,22 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
         self.frame_capture_enabled = True
         self.frame_count = 0
 
-        # 创建 asyncio 任务
+        # 启动异步worker任务（消费者）
+        from handlers.async_workers import FrameSaveWorker
+
+        self.frame_save_worker_task = asyncio.create_task(
+            FrameSaveWorker.run(
+                queue=self.frame_save_queue,
+                connection_id=self.connection_id,
+                get_enabled_func=lambda: self.frame_capture_enabled,
+                get_count_func=lambda: self.frame_count,
+                increment_count_func=lambda: setattr(
+                    self, "frame_count", self.frame_count + 1
+                ),
+            )
+        )
+
+        # 启动抽帧循环任务（生产者）
         self.frame_capture_task = asyncio.create_task(self.frame_capture_loop())
 
         if self.channel:
@@ -401,10 +583,13 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
         )
         self.frame_capture_enabled = False
 
-        # 取消 asyncio 任务
+        # 取消循环任务
         if self.frame_capture_task:
             self.frame_capture_task.cancel()
             self.frame_capture_task = None
+
+        # worker任务会在 frame_capture_enabled 变为 False 后自动退出（处理完队列后）
+        # 这里不需要手动取消 worker，除非需要强制立即停止
 
         if self.channel:
             self.channel.send(
@@ -417,14 +602,21 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
             )
 
     async def frame_capture_loop(self):
-        """抽帧循环任务，每 3 秒保存一帧"""
+        """抽帧循环任务，每 3 秒将当前帧放入队列"""
         logger.info(f"[连接 {self.connection_id}] 抽帧循环任务已启动")
         try:
             while self.frame_capture_enabled:
                 await asyncio.sleep(VideoConstants.FRAME_CAPTURE_INTERVAL)
 
                 if self.latest_video_frame is not None:
-                    self.save_video_frame()
+                    try:
+                        # 将帧放入队列
+                        self.frame_save_queue.put_nowait(self.latest_video_frame.copy())
+                    except asyncio.QueueFull:
+                        self.stats["frame_save_dropped"] += 1
+                        logger.warning(
+                            f"[连接 {self.connection_id}] 抽帧队列已满，丢弃本次抽帧"
+                        )
                 else:
                     logger.warning(
                         f"[连接 {self.connection_id}] 没有可用的视频帧，跳过本次抽帧"
@@ -433,48 +625,6 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
             logger.info(f"[连接 {self.connection_id}] 抽帧循环任务已取消")
         except Exception as e:
             logger.error(f"[连接 {self.connection_id}] 抽帧循环任务异常: {e}")
-
-    def save_video_frame(self):
-        """保存当前视频帧为图片"""
-        if self.latest_video_frame is None:
-            return
-
-        try:
-            # frame 已经是 RGB 或 RGBA (与 video_receive 接收的一致)
-            # PIL Image.fromarray 支持 RGB 和 RGBA，不需要转换
-            frame = self.latest_video_frame
-
-            # 创建 PIL Image
-            image = Image.fromarray(frame.astype("uint8"))
-
-            # 生成文件名
-            timestamp = int(time.time())
-            filename = f"frame_{timestamp}_{self.frame_count:04d}.png"
-            filepath = os.path.join(video_frames_dir_path, filename)
-
-            # 保存图片
-            image.save(filepath)
-            self.frame_count += 1
-
-            logger.info(
-                f"[连接 {self.connection_id}] 视频帧已保存: {filename} "
-                f"(第 {self.frame_count} 帧, 分辨率: {self.video_resolution[0]}x{self.video_resolution[1]})"
-            )
-
-            # 发送保存成功消息
-            if self.channel:
-                self.channel.send(
-                    json.dumps(
-                        {
-                            "type": MessageType.FRAME_SAVED.value,
-                            "filename": filename,
-                            "count": self.frame_count,
-                            "resolution": f"{self.video_resolution[0]}x{self.video_resolution[1]}",
-                        }
-                    )
-                )
-        except Exception as e:
-            logger.error(f"[连接 {self.connection_id}] 保存视频帧时出错: {e}")
 
     # ========================================================================
     # 视频录制功能
@@ -527,6 +677,21 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
             self.video_recording_enabled = True
             self.recorded_video_frames = 0
 
+            # ✨ 启动异步worker任务
+            from handlers.async_workers import VideoRecordingWorker
+
+            self.video_recording_worker_task = asyncio.create_task(
+                VideoRecordingWorker.run(
+                    queue=self.video_recording_queue,
+                    video_writer=self.video_writer,
+                    connection_id=self.connection_id,
+                    stats=self.stats,
+                    get_enabled_func=lambda: self.video_recording_enabled,
+                    resolution=(width, height),
+                )
+            )
+            logger.info(f"[连接 {self.connection_id}] 视频录制worker任务已启动")
+
             logger.info(
                 f"[连接 {self.connection_id}] 启动视频录制: {filename} "
                 f"(分辨率: {width}x{height}, 帧率: {fps} fps)"
@@ -553,19 +718,48 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
                     )
                 )
 
-    def stop_video_recording(self):
-        """停止视频流录制"""
+    async def _stop_video_recording_async(self):
+        """异步停止视频录制"""
         if not self.video_recording_enabled:
-            logger.warning(
-                f"[连接 {self.connection_id}] 视频录制未在进行，忽略停止请求"
-            )
             return
 
         try:
+            # 1. 停止接收新帧
             self.video_recording_enabled = False
 
+            # 2. 等待worker处理完队列中的帧（带超时）
+            from constants import AsyncTaskConstants
+
+            start_time = time.time()
+            while not self.video_recording_queue.empty():
+                if time.time() - start_time > AsyncTaskConstants.SHUTDOWN_WAIT_TIMEOUT:
+                    logger.warning(
+                        f"[连接 {self.connection_id}] 等待视频录制队列清空超时"
+                    )
+                    break
+                await asyncio.sleep(0.1)
+
+            # 3. 等待worker任务完成
+            if self.video_recording_worker_task:
+                try:
+                    await asyncio.wait_for(
+                        self.video_recording_worker_task, timeout=2.0
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        f"[连接 {self.connection_id}] 视频录制worker关闭超时"
+                    )
+                    self.video_recording_worker_task.cancel()
+                except Exception as e:
+                    logger.error(
+                        f"[连接 {self.connection_id}] 视频录制worker关闭异常: {e}"
+                    )
+                self.video_recording_worker_task = None
+
+            # 4. 释放资源
             if self.video_writer is not None:
-                self.video_writer.release()
+                # 在线程中释放，避免阻塞
+                await asyncio.to_thread(self.video_writer.release)
                 self.video_writer = None
 
             logger.info(
@@ -590,3 +784,14 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
                 )
         except Exception as e:
             logger.error(f"[连接 {self.connection_id}] 停止视频录制时出错: {e}")
+
+    def stop_video_recording(self):
+        """停止视频流录制（同步入口，实际调用异步方法）"""
+        if not self.video_recording_enabled:
+            logger.warning(
+                f"[连接 {self.connection_id}] 视频录制未在进行，忽略停止请求"
+            )
+            return
+
+        # 创建后台任务来执行停止逻辑
+        asyncio.create_task(self._stop_video_recording_async())
