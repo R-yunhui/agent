@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能工作日报助手</title>
+
+    <!-- 引入样式 -->
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+    <link rel="stylesheet" href="/static/style.css">
+
+    <!-- 引入 Vue 和组件库 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/element-plus"></script>
+    <script src="https://unpkg.com/@element-plus/icons-vue"></script>
+
+    <!-- 引入工具库 -->
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+    <div id="app" class="app-container">
+        <div class="header">
+            <h1>🚀 智能工作日报助手</h1>
+            <p>基于大模型自动生成专业日报</p>
+        </div>
+
+        <el-row :gutter="20">
+            <!-- 左侧：录入表单 -->
+            <el-col :span="12" :xs="24">
+                <el-card class="box-card">
+                    <template #header>
+                        <div class="card-header">
+                            <span>📝 今日工作记录</span>
+                            <el-date-picker v-model="form.record_date" type="date" placeholder="选择日期"
+                                format="YYYY-MM-DD" value-format="YYYY-MM-DD" :clearable="false" />
+                        </div>
+                    </template>
+
+                    <el-form :model="form" label-position="top">
+                        <el-form-item label="🚀 项目工作 (必填)" required>
+                            <el-input v-model="form.project" type="textarea" :rows="4"
+                                placeholder="例如：完成登录模块开发，对接支付接口..." />
+                        </el-form-item>
+
+                        <el-form-item label="📅 明日计划 (必填)" required>
+                            <el-input v-model="form.tomorrow" type="textarea" :rows="3" placeholder="例如：继续优化数据库查询..." />
+                        </el-form-item>
+
+                        <el-form-item label="🎯 产品工作 (可选)">
+                            <el-input v-model="form.product" type="textarea" :rows="2" placeholder="例如：需求评审、用户调研..." />
+                        </el-form-item>
+
+                        <el-form-item label="📌 其它工作 (可选)">
+                            <el-input v-model="form.others" type="textarea" :rows="2" placeholder="例如：技术分享、学习..." />
+                        </el-form-item>
+
+                        <el-form-item label="⚠️ 风险与问题 (可选)">
+                            <el-input v-model="form.risks" type="textarea" :rows="2" placeholder="例如：性能瓶颈、依赖延期..." />
+                        </el-form-item>
+
+                        <el-form-item>
+                            <el-button type="primary" @click="generateReport" :loading="loading" style="width: 100%">
+                                ✨ 保存并生成日报
+                            </el-button>
+                        </el-form-item>
+                    </el-form>
+                </el-card>
+            </el-col>
+
+            <!-- 右侧：生成结果 -->
+            <el-col :span="12" :xs="24">
+                <el-card class="box-card" style="min-height: 600px">
+                    <template #header>
+                        <div class="card-header">
+                            <span>📊 日报预览</span>
+                            <el-button v-if="generatedReport" type="success" size="small" @click="copyReport">
+                                复制内容
+                            </el-button>
+                        </div>
+                    </template>
+
+                    <!-- 使用 v-html 渲染 Markdown -->
+                    <div v-if="generatedReport" class="markdown-body" v-html="renderMarkdown(generatedReport)"></div>
+
+                    <el-empty v-else description="暂无生成内容，请先在左侧录入并点击生成" />
+                </el-card>
+            </el-col>
+        </el-row>
+    </div>
+
+    <!-- 引入逻辑 -->
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
