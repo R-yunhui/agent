@@ -1,7 +1,8 @@
 /* 全局样式 */
 body {
     font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
-    background-color: #f5f7fa;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
     margin: 0;
     padding: 0;
 }
@@ -15,19 +16,25 @@ body {
 .header {
     text-align: center;
     margin-bottom: 30px;
-    color: #303133;
+    color: #ffffff;
 }
 
 .header h1 {
     font-weight: 600;
     margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.header p {
+    opacity: 0.9;
 }
 
 /* 卡片样式 */
 .box-card {
     margin-bottom: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.15);
+    border: none;
 }
 
 .card-header {
@@ -36,17 +43,102 @@ body {
     align-items: center;
 }
 
+/* Tab 样式 */
+.report-tabs {
+    margin: -10px -10px 0 -10px;
+}
+
+.report-tabs .el-tabs__header {
+    margin-bottom: 20px;
+}
+
+.report-tabs .el-tabs__item {
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.report-tabs .el-tabs__item.is-active {
+    color: #667eea;
+}
+
+.report-tabs .el-tabs__active-bar {
+    background-color: #667eea;
+}
+
+/* Tab 头部 */
+.tab-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #ebeef5;
+}
+
+.tab-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #303133;
+}
+
 /* 表单样式 */
-.form-section {
-    padding: 20px;
+.report-form {
+    padding: 0 5px;
+}
+
+.report-form .el-form-item {
+    margin-bottom: 18px;
+}
+
+.report-form .el-form-item__label {
+    font-weight: 500;
+    color: #606266;
+}
+
+/* 日期范围选择器样式 */
+.report-form .el-date-editor--daterange {
+    width: 100% !important;
+}
+
+.report-form .el-date-editor .el-range-separator {
+    color: #606266;
+}
+
+.report-form .el-date-editor .el-range-input {
+    color: #303133;
+}
+
+/* 周报提示信息 */
+.weekly-info {
+    width: 100%;
+}
+
+.weekly-info .el-alert {
+    border-radius: 8px;
+}
+
+/* 主按钮样式 */
+.report-form .el-button--primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 8px;
+    height: 44px;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.report-form .el-button--primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 /* Markdown 渲染样式 */
 .markdown-body {
     padding: 20px;
     background-color: #ffffff;
-    border-radius: 4px;
-    line-height: 1.6;
+    border-radius: 8px;
+    line-height: 1.8;
     color: #24292e;
 }
 
@@ -55,11 +147,17 @@ body {
     margin-bottom: 16px;
     font-weight: 600;
     line-height: 1.25;
+    color: #1a1a2e;
 }
 
 .markdown-body h2 {
     padding-bottom: 0.3em;
-    border-bottom: 1px solid #eaecef;
+    border-bottom: 2px solid #667eea;
+    color: #667eea;
+}
+
+.markdown-body h3 {
+    color: #4a4a6a;
 }
 
 .markdown-body ul {
@@ -67,7 +165,7 @@ body {
 }
 
 .markdown-body li {
-    margin-top: 0.25em;
+    margin-top: 0.5em;
 }
 
 .markdown-body strong {
@@ -75,10 +173,29 @@ body {
     color: #2c3e50;
 }
 
+.markdown-body hr {
+    border: none;
+    border-top: 1px solid #eaecef;
+    margin: 24px 0;
+}
+
+/* 空状态样式 */
+.el-empty {
+    padding: 60px 0;
+}
+
+.el-empty__description {
+    color: #909399;
+}
+
 /* 响应式调整 */
 @media (max-width: 768px) {
     .app-container {
         padding: 10px;
+    }
+    
+    .header h1 {
+        font-size: 1.5em;
     }
     
     .el-row {
@@ -89,4 +206,34 @@ body {
         width: 100% !important;
         margin-bottom: 20px;
     }
+
+    .tab-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .report-form .el-date-editor--daterange {
+        width: 100% !important;
+    }
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
 }
