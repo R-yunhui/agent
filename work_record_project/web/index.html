@@ -27,29 +27,94 @@
     <div id="app" class="app-container">
         <div class="header">
             <h1>🚀 智能工作报告助手</h1>
-            <p>基于大模型自动生成专业日报/周报</p>
+            <p>基于大模型自动生成专业日报/周报，支持智能对话</p>
         </div>
 
-        <el-row :gutter="20">
-            <!-- 左侧：录入表单 -->
-            <el-col :span="12" :xs="24">
-                <el-card class="box-card">
-                    <!-- Tab 切换 -->
-                    <el-tabs v-model="activeTab" class="report-tabs">
-                        <!-- 日报 Tab -->
-                        <el-tab-pane label="📝 日报" name="daily">
-                            <div class="tab-header">
-                                <span class="tab-title">今日工作记录</span>
-                                <el-date-picker 
-                                    v-model="form.record_date" 
-                                    type="date" 
-                                    placeholder="选择日期"
-                                    format="YYYY-MM-DD" 
-                                    value-format="YYYY-MM-DD" 
-                                    :clearable="false" 
-                                    size="small"
-                                />
+        <!-- 主 Tab 切换：对话 / 日报 / 周报 -->
+        <el-tabs v-model="mainTab" class="main-tabs">
+            
+            <!-- 💬 对话 Tab -->
+            <el-tab-pane label="💬 对话" name="chat">
+                <el-card class="chat-card">
+                    <!-- 聊天消息区域 -->
+                    <div class="chat-messages" ref="chatMessagesRef">
+                        <!-- 欢迎消息 -->
+                        <div v-if="chatMessages.length === 0" class="chat-welcome">
+                            <div class="welcome-icon">🤖</div>
+                            <h3>你好，我是智能助手</h3>
+                            <p>你可以问我任何问题，或者查询你的工作记录</p>
+                            <div class="welcome-examples">
+                                <span class="example-tag" @click="sendQuickMessage('周一干了什么？')">周一干了什么？</span>
+                                <span class="example-tag" @click="sendQuickMessage('帮我写一份工作汇报')">帮我写一份工作汇报</span>
+                                <span class="example-tag" @click="sendQuickMessage('最近有什么风险问题？')">最近有什么风险问题？</span>
                             </div>
+                        </div>
+
+                        <!-- 消息列表 -->
+                        <div v-for="(msg, index) in chatMessages" :key="index" 
+                             :class="['chat-message', msg.role === 'user' ? 'user-message' : 'ai-message']">
+                            <div class="message-avatar">
+                                {{ msg.role === 'user' ? '👤' : '🤖' }}
+                            </div>
+                            <div class="message-content">
+                                <div v-if="msg.role === 'ai'" class="markdown-body" v-html="renderMarkdown(msg.content)"></div>
+                                <div v-else>{{ msg.content }}</div>
+                            </div>
+                        </div>
+
+                        <!-- AI 正在输入指示器 -->
+                        <div v-if="isAiTyping" class="chat-message ai-message typing-indicator">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message-content">
+                                <span class="typing-dots">
+                                    <span></span><span></span><span></span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 输入区域 -->
+                    <div class="chat-input-area">
+                        <el-input
+                            v-model="chatInput"
+                            type="textarea"
+                            :rows="2"
+                            placeholder="输入消息，按 Enter 发送，Shift+Enter 换行..."
+                            @keydown.enter.exact.prevent="sendChatMessage"
+                            :disabled="isAiTyping"
+                        />
+                        <div class="chat-actions">
+                            <el-button @click="clearChatHistory" size="small" :disabled="chatMessages.length === 0">
+                                🗑️ 清空对话
+                            </el-button>
+                            <el-button type="primary" @click="sendChatMessage" :loading="isAiTyping" :disabled="!chatInput.trim()">
+                                发送 ✨
+                            </el-button>
+                        </div>
+                    </div>
+                </el-card>
+            </el-tab-pane>
+
+            <!-- 📝 日报 Tab -->
+            <el-tab-pane label="📝 日报" name="daily">
+                <el-row :gutter="20">
+                    <!-- 左侧：录入表单 -->
+                    <el-col :span="12" :xs="24">
+                        <el-card class="box-card">
+                            <template #header>
+                                <div class="card-header">
+                                    <span class="tab-title">📝 今日工作记录</span>
+                                    <el-date-picker 
+                                        v-model="form.record_date" 
+                                        type="date" 
+                                        placeholder="选择日期"
+                                        format="YYYY-MM-DD" 
+                                        value-format="YYYY-MM-DD" 
+                                        :clearable="false" 
+                                        size="small"
+                                    />
+                                </div>
+                            </template>
 
                             <el-form :model="form" label-position="top" class="report-form">
                                 <el-form-item label="🚀 项目工作 (必填)" required>
@@ -83,13 +148,39 @@
                                     </el-button>
                                 </el-form-item>
                             </el-form>
-                        </el-tab-pane>
+                        </el-card>
+                    </el-col>
 
-                        <!-- 周报 Tab -->
-                        <el-tab-pane label="📊 周报" name="weekly">
-                            <div class="tab-header">
-                                <span class="tab-title">选择周报日期范围</span>
-                            </div>
+                    <!-- 右侧：生成结果 -->
+                    <el-col :span="12" :xs="24">
+                        <el-card class="box-card" style="min-height: 600px">
+                            <template #header>
+                                <div class="card-header">
+                                    <span>📋 日报预览</span>
+                                    <el-button v-if="generatedReport" type="success" size="small" @click="copyReport">
+                                        复制内容
+                                    </el-button>
+                                </div>
+                            </template>
+
+                            <div v-if="generatedReport" class="markdown-body" v-html="renderMarkdown(generatedReport)"></div>
+                            <el-empty v-else description="暂无生成内容，请先在左侧录入并点击生成" />
+                        </el-card>
+                    </el-col>
+                </el-row>
+            </el-tab-pane>
+
+            <!-- 📊 周报 Tab -->
+            <el-tab-pane label="📊 周报" name="weekly">
+                <el-row :gutter="20">
+                    <!-- 左侧：日期选择 -->
+                    <el-col :span="12" :xs="24">
+                        <el-card class="box-card">
+                            <template #header>
+                                <div class="card-header">
+                                    <span class="tab-title">📊 选择周报日期范围</span>
+                                </div>
+                            </template>
 
                             <el-form label-position="top" class="report-form">
                                 <el-form-item label="📆 日期范围">
@@ -124,30 +215,29 @@
                                     </el-button>
                                 </el-form-item>
                             </el-form>
-                        </el-tab-pane>
-                    </el-tabs>
-                </el-card>
-            </el-col>
+                        </el-card>
+                    </el-col>
 
-            <!-- 右侧：生成结果 -->
-            <el-col :span="12" :xs="24">
-                <el-card class="box-card" style="min-height: 600px">
-                    <template #header>
-                        <div class="card-header">
-                            <span>{{ activeTab === 'daily' ? '📋 日报预览' : '📊 周报预览' }}</span>
-                            <el-button v-if="generatedReport" type="success" size="small" @click="copyReport">
-                                复制内容
-                            </el-button>
-                        </div>
-                    </template>
+                    <!-- 右侧：生成结果 -->
+                    <el-col :span="12" :xs="24">
+                        <el-card class="box-card" style="min-height: 400px">
+                            <template #header>
+                                <div class="card-header">
+                                    <span>📊 周报预览</span>
+                                    <el-button v-if="generatedReport" type="success" size="small" @click="copyReport">
+                                        复制内容
+                                    </el-button>
+                                </div>
+                            </template>
 
-                    <!-- 使用 v-html 渲染 Markdown -->
-                    <div v-if="generatedReport" class="markdown-body" v-html="renderMarkdown(generatedReport)"></div>
+                            <div v-if="generatedReport" class="markdown-body" v-html="renderMarkdown(generatedReport)"></div>
+                            <el-empty v-else description="暂无生成内容，请选择日期范围后点击生成" />
+                        </el-card>
+                    </el-col>
+                </el-row>
+            </el-tab-pane>
 
-                    <el-empty v-else :description="activeTab === 'daily' ? '暂无生成内容，请先在左侧录入并点击生成' : '暂无生成内容，请选择日期范围后点击生成'" />
-                </el-card>
-            </el-col>
-        </el-row>
+        </el-tabs>
     </div>
 
     <!-- 引入逻辑 -->

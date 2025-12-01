@@ -118,11 +118,6 @@ class CustomMultimodalEmbeddings(Embeddings):
         self.timeout = timeout
         self.batch_size = batch_size
 
-        print(f"📊 初始化自定义 Embedding:")
-        print(f"   API Base: {self.api_base}")
-        print(f"   Model: {self.model}")
-        print(f"   Batch Size: {self.batch_size}")
-
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """
         向量化多个文档

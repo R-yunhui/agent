@@ -5,7 +5,8 @@ API 路由聚合器
 """
 
 from fastapi import APIRouter
-from app.api import records
+from work_record_project.app.api import records, chat
+
 # 后续可以添加其他路由
 # from app.api import daily, weekly
 
@@ -14,5 +15,5 @@ api_router = APIRouter()
 
 # 注册各个子路由
 api_router.include_router(records.router)
-# api_router.include_router(daily.router)    # 日报路由（待实现）
-# api_router.include_router(weekly.router)   # 周报路由（待实现）
+
+api_router.include_router(chat.router)

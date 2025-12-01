@@ -2,6 +2,10 @@
 大模型服务
 
 提供日报、周报生成相关的大模型调用功能。
+
+优化说明：
+- 使用 @lru_cache 实现 ChatOpenAI 单例，避免每次调用都创建新实例
+- Prompt 模板也使用缓存，避免重复解析
 """
 
 import sys
@@ -9,8 +13,8 @@ import os
 import logging
 from pathlib import Path
 from datetime import date
-
-from typing import List
+from functools import lru_cache
+from typing import List, Optional
 from dotenv import load_dotenv
 
 # 添加项目根目录到 Python 路径（解决直接运行时的导入问题）
@@ -31,7 +35,20 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-def create_larget_model() -> ChatOpenAI:
+# ==================== 单例管理 ====================
+
+@lru_cache(maxsize=1)
+def _get_chat_model() -> ChatOpenAI:
+    """
+    获取 ChatOpenAI 单例实例
+    
+    使用 @lru_cache 确保整个应用生命周期内只创建一次实例。
+    优点：
+    - 避免重复创建 HTTP 客户端
+    - 减少内存占用
+    - 提高响应速度
+    """
+    logger.info("初始化 ChatOpenAI 实例（单例）")
     return ChatOpenAI(
         api_key=os.getenv("DASHSCOPE_KEY"),
         base_url=os.getenv("DASHSCOPE_BASE_URL"),
@@ -39,10 +56,14 @@ def create_larget_model() -> ChatOpenAI:
     )
 
 
-def create_daily_report(work_record: WorkRecordCreate):
-    # 日报生成的 Prompt 模板
-    daily_report_prompt = ChatPromptTemplate.from_messages([
-        # 系统提示词：定义 AI 的角色和任务
+@lru_cache(maxsize=1)
+def _get_daily_report_prompt() -> ChatPromptTemplate:
+    """
+    获取日报 Prompt 模板（缓存）
+    
+    Prompt 模板是静态的，无需每次都创建。
+    """
+    return ChatPromptTemplate.from_messages([
         ("system", """你是一位专业的工作报告助手，擅长将零散的工作记录整理成结构清晰、简洁专业的日报。
 
             你的任务：
@@ -80,8 +101,6 @@ def create_daily_report(work_record: WorkRecordCreate):
             ---
             **生成时间**: {{当前时间}}
             """),
-
-        # 用户提示词：提供具体的工作记录数据
         ("user", """请根据以下工作记录生成日报：
 
             【基本信息】
@@ -108,8 +127,98 @@ def create_daily_report(work_record: WorkRecordCreate):
         """)
     ])
 
-    llm = create_larget_model()
 
+@lru_cache(maxsize=1)
+def _get_weekly_report_prompt() -> ChatPromptTemplate:
+    """
+    获取周报 Prompt 模板（缓存）
+    """
+    return ChatPromptTemplate.from_messages([
+        ("system", """你是一位专业的工作报告助手，擅长将一周的工作记录汇总整理成结构清晰、重点突出的周报。
+
+            你的任务：
+            1. 根据用户提供的一周工作记录，生成一份格式规范的周报
+            2. 识别连续性工作：将同一项目/任务在不同日期的工作合并描述，体现工作进展
+            3. 提炼重点成果：突出本周完成的关键工作和里程碑
+            4. 汇总风险问题：合并去重，标注问题状态（已解决/进行中/待解决）
+            5. 梳理下周计划：基于本周工作情况，整理下周重点工作
+            6. 保持客观准确，不添加用户未提及的内容
+            
+            输出要求：
+            - 使用 Markdown 格式
+            - 条理清晰，逻辑性强
+            - 字数控制在 400-600 字
+            - 重点突出，便于汇报
+            
+            输出格式：
+            ## {start_date} 至 {end_date} 工作周报
+            
+            ### 本周概览
+            - 工作天数：{{实际有记录的天数}}
+            - 主要聚焦：{{本周主要工作方向，1-2句话概括}}
+            
+            ### 重点工作完成情况
+            
+            **产品工作**
+            - {{汇总本周产品相关工作，按项目/任务分类，如果为空则显示"暂无"}}
+            
+            **项目工作**
+            - {{汇总本周项目相关工作，按项目/任务分类，体现进展}}
+            
+            **其它工作**
+            - {{汇总本周其它工作，如果为空则显示"暂无"}}
+            
+            ### 风险与问题
+            - {{汇总本周的风险和问题，合并重复项，标注状态，如果为空则显示"暂无"}}
+            
+            ### 下周计划
+            - {{基于本周工作和次日计划，整理下周重点工作}}
+            
+            ---
+            **统计**：本周工作 {{X}} 天
+            **生成时间**: {{当前时间}}
+            """),
+        ("user", """请根据以下一周的工作记录生成周报：
+
+            【周报周期】
+            {start_date} 至 {end_date}
+            
+            【每日工作记录】
+            {daily_records}
+            
+            ---
+            请严格按照系统提示中的格式生成周报。
+            注意事项：
+            1. 识别相同或相关的工作内容，合并描述并体现进展
+            2. 如果某天没有记录，不需要特别说明
+            3. 风险问题如果多天重复出现，只列出一次并标注状态
+            4. 下周计划应基于本周最后一天的"次日计划"以及整体工作情况整理
+        """)
+    ])
+
+
+def clear_llm_cache():
+    """
+    清除 LLM 相关缓存
+    
+    用于配置变更后需要重新创建实例的场景。
+    """
+    _get_chat_model.cache_clear()
+    _get_daily_report_prompt.cache_clear()
+    _get_weekly_report_prompt.cache_clear()
+    logger.info("已清除 LLM 缓存")
+
+
+def create_daily_report(work_record: WorkRecordCreate):
+    """
+    生成日报
+    
+    使用缓存的 LLM 实例和 Prompt 模板，提高性能。
+    """
+    # 获取缓存的 Prompt 模板和 LLM 实例
+    daily_report_prompt = _get_daily_report_prompt()
+    llm = _get_chat_model()
+    
     chain = daily_report_prompt | llm
 
     # 准备输入数据，处理可能的 None 值
@@ -165,6 +274,8 @@ def create_weekly_report(start_date: date, end_date: date) -> str:
     """
     生成周报
     
+    使用缓存的 LLM 实例和 Prompt 模板，提高性能。
+    
     Args:
         start_date: 周报开始日期
         end_date: 周报结束日期
@@ -172,74 +283,10 @@ def create_weekly_report(start_date: date, end_date: date) -> str:
     Returns:
         生成的周报内容（Markdown 格式）
     """
-    # 周报生成的 Prompt 模板
-    weekly_report_prompt = ChatPromptTemplate.from_messages([
-        # 系统提示词：定义 AI 的角色和任务
-        ("system", """你是一位专业的工作报告助手，擅长将一周的工作记录汇总整理成结构清晰、重点突出的周报。
-
-            你的任务：
-            1. 根据用户提供的一周工作记录，生成一份格式规范的周报
-            2. 识别连续性工作：将同一项目/任务在不同日期的工作合并描述，体现工作进展
-            3. 提炼重点成果：突出本周完成的关键工作和里程碑
-            4. 汇总风险问题：合并去重，标注问题状态（已解决/进行中/待解决）
-            5. 梳理下周计划：基于本周工作情况，整理下周重点工作
-            6. 保持客观准确，不添加用户未提及的内容
-            
-            输出要求：
-            - 使用 Markdown 格式
-            - 条理清晰，逻辑性强
-            - 字数控制在 400-600 字
-            - 重点突出，便于汇报
-            
-            输出格式：
-            ## {start_date} 至 {end_date} 工作周报
-            
-            ### 本周概览
-            - 工作天数：{{实际有记录的天数}}
-            - 主要聚焦：{{本周主要工作方向，1-2句话概括}}
-            
-            ### 重点工作完成情况
-            
-            **产品工作**
-            - {{汇总本周产品相关工作，按项目/任务分类，如果为空则显示"暂无"}}
-            
-            **项目工作**
-            - {{汇总本周项目相关工作，按项目/任务分类，体现进展}}
-            
-            **其它工作**
-            - {{汇总本周其它工作，如果为空则显示"暂无"}}
-            
-            ### 风险与问题
-            - {{汇总本周的风险和问题，合并重复项，标注状态，如果为空则显示"暂无"}}
-            
-            ### 下周计划
-            - {{基于本周工作和次日计划，整理下周重点工作}}
-            
-            ---
-            **统计**：本周工作 {{X}} 天
-            **生成时间**: {{当前时间}}
-            """),
-
-        # 用户提示词：提供具体的工作记录数据
-        ("user", """请根据以下一周的工作记录生成周报：
-
-            【周报周期】
-            {start_date} 至 {end_date}
-            
-            【每日工作记录】
-            {daily_records}
-            
-            ---
-            请严格按照系统提示中的格式生成周报。
-            注意事项：
-            1. 识别相同或相关的工作内容，合并描述并体现进展
-            2. 如果某天没有记录，不需要特别说明
-            3. 风险问题如果多天重复出现，只列出一次并标注状态
-            4. 下周计划应基于本周最后一天的"次日计划"以及整体工作情况整理
-        """)
-    ])
-
-    llm = create_larget_model()
+    # 获取缓存的 Prompt 模板和 LLM 实例
+    weekly_report_prompt = _get_weekly_report_prompt()
+    llm = _get_chat_model()
+    
     chain = weekly_report_prompt | llm
 
     # 获取日期范围内的工作记录

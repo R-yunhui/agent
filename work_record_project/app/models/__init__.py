@@ -2,7 +2,8 @@
 Pydantic 数据模型
 """
 
-from app.models.work_record import WorkRecordCreate
-from app.models.work_record import WorkRecordResponse
+from work_record_project.app.models.chat_request import ChatRequest
+from work_record_project.app.models.work_record import WorkRecordCreate
+from work_record_project.app.models.work_record import WorkRecordResponse
 
-__all__ = ["WorkRecordCreate", "WorkRecordResponse"]
+__all__ = ["ChatRequest", "WorkRecordCreate", "WorkRecordResponse"]

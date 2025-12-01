@@ -3,18 +3,19 @@ from typing import Optional
 from pydantic import BaseModel
 from datetime import date
 
+
 class WorkRecordCreate(BaseModel):
     """
     创建工作记录的对象
     """
-    
+
     record_date: Optional[date] = Field(None, description="记录日期,默认为当前日期")
     product: Optional[str] = Field("", description="产品相关工作记录")
     project: str = Field(..., min_length=1, description="项目相关工作记录（必填）")
     others: Optional[str] = Field("", description="其他工作记录")
     risks: Optional[str] = Field("", description="风险和问题")
     tomorrow: str = Field(..., description="明天计划做什么")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -26,10 +27,11 @@ class WorkRecordCreate(BaseModel):
                 "tomorrow": "优化数据库查询，完成订单模块"
             }
         }
-        
+
+
 class WorkRecordResponse(BaseModel):
     """工作记录响应"""
-    
+
     record_date: date
     product: str
     project: str

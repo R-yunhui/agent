@@ -5,7 +5,6 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.embeddings import Embeddings
 from langchain_core.documents import Document
-from langchain_openai.embeddings import OpenAIEmbeddings
 from pymilvus import connections, db
 from langchain_milvus import Milvus
 from langchain_text_splitters import RecursiveCharacterTextSplitter
