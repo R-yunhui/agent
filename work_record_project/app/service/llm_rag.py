@@ -92,7 +92,7 @@ class MilvusManager:
     """
 
     _instance: Optional['MilvusManager'] = None
-    # 使用 RLock（可重入锁），避免 get_vectorstore 调用 get_embedding_model 时死锁
+    # 使用 RLock（可重入锁）， Lock（不可冲入的锁，如果一个线程获取之后，同一个线程在获取或导致等待） 避免 get_vectorstore 调用 get_embedding_model 时死锁
     _lock = threading.RLock()
 
     def __new__(cls):
@@ -116,21 +116,21 @@ class MilvusManager:
     def get_embedding_model(self) -> Embeddings:
         """
         获取 Embedding 模型单例
+        
+        注意：此方法只在 get_vectorstore() 内部调用，已在锁保护下，无需额外加锁
         """
         if self._embedding_model is None:
-            with self._lock:
-                if self._embedding_model is None:
-                    logger.info(f"初始化 Embedding 模型实例: {EMBEDDING_MODEL} @ {EMBEDDING_API_BASE}")
-                    try:
-                        self._embedding_model = CustomMultimodalEmbeddings(
-                            api_base=EMBEDDING_API_BASE,
-                            api_key=EMBEDDING_API_KEY,
-                            model=EMBEDDING_MODEL,
-                        )
-                        logger.info("Embedding 模型实例创建成功")
-                    except Exception as e:
-                        logger.error(f"Embedding 模型创建失败: {e}", exc_info=True)
-                        raise
+            logger.info(f"初始化 Embedding 模型实例: {EMBEDDING_MODEL} @ {EMBEDDING_API_BASE}")
+            try:
+                self._embedding_model = CustomMultimodalEmbeddings(
+                    api_base=EMBEDDING_API_BASE,
+                    api_key=EMBEDDING_API_KEY,
+                    model=EMBEDDING_MODEL,
+                )
+                logger.info("Embedding 模型实例创建成功")
+            except Exception as e:
+                logger.error(f"Embedding 模型创建失败: {e}", exc_info=True)
+                raise
         return self._embedding_model
 
     def get_vectorstore(self) -> Milvus:
