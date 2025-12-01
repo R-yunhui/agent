@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/records", tags=["工作记录"])
 
 
 @router.post("/", response_model=WorkRecordResponse)
-async def create_work_record(work_record: WorkRecordCreate):
+def create_work_record(work_record: WorkRecordCreate):
     """
     添加工作记录
     """
@@ -46,7 +46,7 @@ async def create_work_record(work_record: WorkRecordCreate):
 
 
 @router.get("/", response_model=List[WorkRecordResponse])
-async def get_work_records(start_date: date, end_date: date):
+def get_work_records(start_date: date, end_date: date):
     """
     获取指定日期范围内的工作记录
     """
@@ -65,7 +65,7 @@ async def get_work_records(start_date: date, end_date: date):
 
 
 @router.post("/daily/generate", response_model=str)
-async def generate_daily_report(
+def generate_daily_report(
         record_date: date = None,
         background_tasks: BackgroundTasks = None
 ):
@@ -117,7 +117,7 @@ async def generate_daily_report(
 
 
 @router.post("/weekly/generate", response_model=str)
-async def generate_weekly_report(
+def generate_weekly_report(
         start_date: date,
         end_date: date,
         background_tasks: BackgroundTasks = None
