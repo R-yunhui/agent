@@ -22,6 +22,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from basic.embedding.custom_embeddings import CustomMultimodalEmbeddings
 from dotenv import load_dotenv
+from work_record_project.app.core import ReportType
 
 # 加载环境变量
 load_dotenv()
@@ -213,7 +214,7 @@ def _get_milvus_manager() -> MilvusManager:
 
 # ==================== 公开 API ====================
 
-def embedding_with_llm(start_date: date, end_date: date, text: str) -> None:
+def embedding_with_llm(start_date: date, end_date: date, report: str, report_type: ReportType) -> None:
     """
     将文本向量化并存储到 Milvus
     
@@ -222,10 +223,11 @@ def embedding_with_llm(start_date: date, end_date: date, text: str) -> None:
     Args:
         start_date: 报告开始日期
         end_date: 报告结束日期
-        text: 要向量化的文本（Markdown 格式）
+        report: 要向量化的文本（Markdown 格式）
+        report_type: 报告类型（daily 或 weekly）
     """
     logger.info(f"开始向量化存储，日期范围: {start_date} ~ {end_date}")
-    logger.debug(f"输入文本长度: {len(text)} 字符")
+    logger.debug(f"输入文本长度: {len(report)} 字符")
 
     try:
         # 获取向量存储（使用单例）
@@ -247,7 +249,7 @@ def embedding_with_llm(start_date: date, end_date: date, text: str) -> None:
             return_each_line=False,
         )
 
-        docs = markdown_splitter.split_text(text)
+        docs = markdown_splitter.split_text(report)
         logger.info(f"Markdown 分割完成，得到 {len(docs)} 个文档块")
 
         # 检查是否有文档
@@ -264,9 +266,7 @@ def embedding_with_llm(start_date: date, end_date: date, text: str) -> None:
                     "start_date": str(start_date),
                     "end_date": str(end_date),
                     "create_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "h1": "h1" in doc.metadata,
-                    "h2": "h2" in doc.metadata,
-                    "h3": "h3" in doc.metadata,
+                    "report_type": report_type.value,
                 }
             )
             for doc in docs
@@ -283,32 +283,52 @@ def embedding_with_llm(start_date: date, end_date: date, text: str) -> None:
         raise
 
 
-def search_similar_documents(query: str, k: int = 5, start_date: Optional[date] = None,
-                             end_date: Optional[date] = None) -> list:
+def search_similar_documents(
+        query: str, 
+        k: int = 5, 
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        report_type: Optional[str] = None
+) -> list:
     """
-        语义搜索相似文档
+    语义搜索相似文档
 
-        Args:
-            query: 搜索查询
-            k: 返回结果数量
-            start_date: 报告开始日期
-            end_date: 报告结束日期
+    Args:
+        query: 搜索查询
+        k: 返回结果数量
+        start_date: 报告开始日期
+        end_date: 报告结束日期
+        report_type: 报告类型过滤（daily/weekly/None 表示全部）
 
-        Returns:
-            相似文档列表
+    Returns:
+        相似文档列表
     """
     try:
         manager = _get_milvus_manager()
         vectorstore = manager.get_vectorstore()
-        filter_expr = None
+        
+        # 构建过滤条件
+        filter_conditions = []
+        
+        # 日期过滤
         if start_date and end_date:
-            # Milvus 过滤语法
-            filter_expr = f'start_date >= "{start_date}" and end_date <= "{end_date}"'
+            filter_conditions.append(f'start_date >= "{start_date}"')
+            filter_conditions.append(f'end_date <= "{end_date}"')
+        
+        # 报告类型过滤
+        if report_type:
+            filter_conditions.append(f'report_type == "{report_type}"')
+        
+        # 组合过滤条件
+        filter_expr = " and ".join(filter_conditions) if filter_conditions else None
+        
+        if filter_expr:
+            logger.info(f"检索过滤条件: {filter_expr}")
 
         results = vectorstore.similarity_search(
             query,
             k=k,
-            expr=filter_expr  # 添加过滤
+            expr=filter_expr
         )
         logger.info(f"搜索到 {len(results)} 条相关文档")
         return results
@@ -372,7 +392,7 @@ def main():
     print("-" * 60)
 
     try:
-        embedding_with_llm(start_date, end_date, text)
+        embedding_with_llm(start_date, end_date, text, "daily")
         print("\n" + "=" * 60)
         print("✅ 测试完成")
         print("=" * 60)

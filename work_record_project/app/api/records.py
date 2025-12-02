@@ -8,6 +8,7 @@ from datetime import date, datetime
 import logging
 from work_record_project.app.service import storage
 from work_record_project.app.models import WorkRecordCreate, WorkRecordResponse
+from work_record_project.app.core import ReportType
 from work_record_project.app.service import create_daily_report as generate_report_content, \
     create_weekly_report as generate_weekly_report_content, \
     embedding_with_llm as embed_report_content
@@ -58,7 +59,7 @@ def get_work_records(start_date: date, end_date: date):
         raise HTTPException(status_code=400, detail="开始日期不能晚于结束日期")
 
     # 从存储获取记录
-    records = storage.get_work_records(start_date, end_date)
+    records = storage.get_work_records_by_date_range(start_date, end_date)
     logger.info(f"成功获取 {len(records)} 条工作记录")
 
     return records
@@ -106,7 +107,8 @@ def generate_daily_report(
                 embed_report_content,
                 target_date,
                 target_date,
-                report_content
+                report_content,
+                ReportType.DAILY  # 日报类型
             )
             logger.info(f"已添加日报向量化任务到后台队列: date={target_date}")
 
@@ -156,7 +158,8 @@ def generate_weekly_report(
                 embed_report_content,
                 start_date,
                 end_date,
-                report_content
+                report_content,
+                ReportType.WEEKLY  # 周报类型
             )
             logger.info(f"已添加周报向量化任务到后台队列: {start_date} ~ {end_date}")
 
