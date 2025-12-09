@@ -7,6 +7,9 @@ langgraph==1.0.2
 # langchain openai
 langchain-openai==1.0.2
 
+# langgraph-checkpoint-sqlite
+langgraph-checkpoint-sqlite==3.0.0
+
 # 阿里云百炼大模型
 dashscope==1.25.1
 
