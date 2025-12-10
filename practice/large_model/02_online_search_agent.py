@@ -34,6 +34,7 @@ def bocha_websearch_tool(query: str, count: int = 10) -> str:
     Returns:
         str: 搜索结果的详细信息，包括网页标题、网页URL、网页摘要、网站名称、网站Icon、网页发布时间等。
     """
+    print(f"开始进行联网检索. 问题: {query}")
     url = "https://api.bochaai.com/v1/web-search"
 
     headers = {
@@ -112,4 +113,4 @@ def main(query: str):
 
 
 if __name__ == "__main__":
-    main("请帮我分析一下最近1年成都二手房的价格变化趋势,并给出一些购房建议")
+    main("未来3天成都的天气如何？")
