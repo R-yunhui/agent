@@ -21,6 +21,10 @@ langchain-milvus==0.2.2
 # langchain mcp
 langchain-mcp-adapters==0.1.13
 
+# deepagents
+deepagents==0.3.0
+tavily-python==0.7.14
+
 # fast mcp
 fastmcp==2.13.0.2
 
