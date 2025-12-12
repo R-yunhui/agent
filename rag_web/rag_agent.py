@@ -21,6 +21,7 @@ from basic.embedding.custom_embeddings import CustomMultimodalEmbeddings
 # 1. 加载配置文件
 # ============================================================
 
+
 def load_config():
     """加载 YAML 配置文件"""
     config_path = os.path.join(os.path.dirname(__file__), "config/config.yaml")
@@ -36,7 +37,7 @@ chat_memory_history: Dict[str, ChatMessageHistory] = {}
 connection_args = {
     "uri": f"http://{config['milvus']['host']}:{config['milvus']['port']}",
     "user": config["milvus"]["user"],
-    "password": config["milvus"]["password"]
+    "password": config["milvus"]["password"],
 }
 
 
@@ -63,8 +64,16 @@ def chat_with_memory(user_question: str, session_id: str) -> ABCIterator:
                 print(f"检索到的文档相似度：{score:.4f}")
 
         # 过滤分数低于 similarity_threshold 的
-        vectorstore_results = list(filter(lambda vectorstore_result: vectorstore_result[1] >= config["rag"]["similarity_threshold"], vectorstore_results))
-        print(f"过滤分数低于 {config['rag']['similarity_threshold']} 后的文档数量: {len(vectorstore_results)}")
+        vectorstore_results = list(
+            filter(
+                lambda vectorstore_result: vectorstore_result[1]
+                >= config["rag"]["similarity_threshold"],
+                vectorstore_results,
+            )
+        )
+        print(
+            f"过滤分数低于 {config['rag']['similarity_threshold']} 后的文档数量: {len(vectorstore_results)}"
+        )
 
         message_history = create_chat_with_memory()
 
@@ -75,7 +84,9 @@ def chat_with_memory(user_question: str, session_id: str) -> ABCIterator:
             contents = []
             for result in vectorstore_results:
                 document, score = result
-                print(f"  - 相似度: {score:.4f}, 内容: {document.page_content[:100]}...")
+                print(
+                    f"  - 相似度: {score:.4f}, 内容: {document.page_content[:100]}..."
+                )
                 # 只使用相似度高于阈值的文档
                 if score >= config["rag"]["similarity_threshold"]:
                     contents.append(document.page_content)
@@ -95,7 +106,7 @@ def chat_with_memory(user_question: str, session_id: str) -> ABCIterator:
 
         return message_history.stream(
             {"user_question": user_question},
-            config=RunnableConfig(configurable={"session_id": session_id})
+            config=RunnableConfig(configurable={"session_id": session_id}),
         )
 
     except Exception as e:
@@ -104,18 +115,20 @@ def chat_with_memory(user_question: str, session_id: str) -> ABCIterator:
         message_history = create_chat_with_memory()
         return message_history.stream(
             {"user_question": user_question},
-            config=RunnableConfig(configurable={"session_id": session_id})
+            config=RunnableConfig(configurable={"session_id": session_id}),
         )
 
 
 def create_chat_with_memory() -> RunnableWithMessageHistory:
     """创建一个可记忆历史的聊天函数"""
-    prompt_template = ChatPromptTemplate.from_messages([
-        ("system", config["prompts"]["system"]),
-        # 对话历史
-        MessagesPlaceholder(variable_name="history"),
-        ("human", "{user_question}"),
-    ])
+    prompt_template = ChatPromptTemplate.from_messages(
+        [
+            ("system", config["prompts"]["system"]),
+            # 对话历史
+            MessagesPlaceholder(variable_name="history"),
+            ("human", "{user_question}"),
+        ]
+    )
 
     llm = get_large_model()
     runnable = prompt_template | llm
@@ -229,7 +242,7 @@ def rag_execute_with_file(path: str, session_id: str) -> Milvus:
                     "source": "local",
                     "category": "language",
                     "session_id": session_id,
-                }
+                },
             )
             for text in split_documents
         ]
@@ -289,12 +302,9 @@ def create_vector_store() -> Milvus:
             index_params={
                 "index_type": "IVF_FLAT",
                 "metric_type": "COSINE",  # 余弦距离
-                "params": {"nlist": 128}
+                "params": {"nlist": 128},
             },
-            search_params={
-                "metric_type": "COSINE",
-                "params": {"nprobe": 16}
-            },
+            search_params={"metric_type": "COSINE", "params": {"nprobe": 16}},
             drop_old=False,
         )
 
@@ -307,10 +317,7 @@ def create_vector_store() -> Milvus:
 
 def check_data_base_exists(db_name: str) -> bool:
     try:
-        connections.connect(
-            alias="default",
-            **connection_args
-        )
+        connections.connect(alias="default", **connection_args)
 
         database_list = db.list_database()
         if db_name in database_list:
@@ -350,7 +357,9 @@ def main():
         vectorstore = rag_execute_with_file(path, session_id)
         print("✅ 向量存储创建成功")
 
-        results_with_scores = vectorstore.similarity_search_with_score("如何从Java转换到Python的学习", 3)
+        results_with_scores = vectorstore.similarity_search_with_score(
+            "如何从Java转换到Python的学习", 3
+        )
         if results_with_scores:
             for j, (doc, score) in enumerate(results_with_scores, 1):
                 print(f"\n  结果 {j}:")
