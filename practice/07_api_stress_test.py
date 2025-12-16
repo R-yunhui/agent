@@ -40,7 +40,6 @@ MODELS_CONFIG = {
     },
 }
 
-
 # 用户提示词模板
 USER_PROMPT_TEMPLATE = """
 **检测内容：**
@@ -113,11 +112,11 @@ class StressTestResult:
 
 
 def build_request_payload(
-    model_name: str,
-    positive_examples: list[str],
-    negative_examples: list[str],
-    target_images: list[str],
-    rule_text: str,
+        model_name: str,
+        positive_examples: list[str],
+        negative_examples: list[str],
+        target_images: list[str],
+        rule_text: str,
 ) -> dict[str, Any]:
     """
     构建请求体 (Few-Shot 模式)
@@ -145,7 +144,7 @@ def build_request_payload(
     # 如果 target_images 也是时序图，需要给个标签，或者直接放图
     # 这里假设如果是时序图，每张图都加进去
     for index, url in enumerate(target_images):
-        target_img_contents.append({"type": "text", "text": f"#步骤{index+1}"})
+        target_img_contents.append({"type": "text", "text": f"#步骤{index + 1}"})
         target_img_contents.append({"type": "image_url", "image_url": {"url": url}})
 
     # 3. 组装 user 消息内容
@@ -215,6 +214,7 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
 def load_images_with_names(image_dir: Path) -> list[tuple[str, str]]:
     """
     加载目录下的图片，返回 (文件名, Base64编码) 的列表
+    会自动将图片压缩到最大 768x768 分辨率
     """
     if not image_dir.exists():
         print(f"  ⚠ 目录不存在: {image_dir}")
@@ -224,36 +224,43 @@ def load_images_with_names(image_dir: Path) -> list[tuple[str, str]]:
     # 按文件名排序
     for file_path in sorted(image_dir.iterdir()):
         if file_path.is_file() and file_path.suffix.lower() in IMAGE_EXTENSIONS:
-            with open(file_path, "rb") as img:
-                if img.mode in ("RGBA", "P"):
-                    img = img.convert("RGB")
+            try:
+                with Image.open(file_path) as img:
+                    # 转换颜色模式，确保兼容性 (JPEG 不支持 RGBA)
+                    if img.mode in ("RGBA", "P"):
+                        img = img.convert("RGB")
 
-                # 获取原始尺寸
-                width, height = img.size
-                # 计算缩放比例
-                scale = min(max_size / width, max_size / height)
-                new_width = int(width * scale)
-                new_height = int(height * scale)
+                    width, height = img.size
+                    max_dim = 768
 
-                # 缩放图像
-                img_resized = img.resize(
-                    (new_width, new_height), Image.Resampling.LANCZOS
-                )
+                    # 如果任一边的尺寸超过 768，则进行缩放
+                    if width > max_dim or height > max_dim:
+                        # 计算缩放比例
+                        scale = min(max_dim / width, max_dim / height)
+                        new_width = int(width * scale)
+                        new_height = int(height * scale)
 
-                # 保存到内存
-                buffer = BytesIO()
-                img_resized.save(buffer, format="JPEG", quality=85, optimize=True)
-                buffer.seek(0)
+                        # print(f"  [压缩] {file_path.name}: {width}x{height} -> {new_width}x{new_height}")
+                        img = img.resize(
+                            (new_width, new_height), Image.Resampling.LANCZOS
+                        )
 
-                # 转为 base64
-                img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+                    # 保存到内存
+                    buffer = BytesIO()
+                    # 统一转为 JPEG 以压缩体积
+                    img.save(buffer, format="JPEG", quality=85, optimize=True)
+                    buffer.seek(0)
 
-                mime_type = (
-                    "image/jpeg"
-                    if file_path.suffix.lower() in {".jpg", ".jpeg"}
-                    else f"image/{file_path.suffix[1:].lower()}"
-                )
-                res.append((file_path.name, f"data:{mime_type};base64,{img_base64}"))
+                    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+                    # 统一使用 jpeg MIME
+                    mime_type = "image/jpeg"
+                    res.append(
+                        (file_path.name, f"data:{mime_type};base64,{img_base64}")
+                    )
+            except Exception as e:
+                print(f"  ❌ 加载图片失败 {file_path.name}: {e}")
+
     return res
 
 
@@ -263,12 +270,12 @@ def image_to_base64(image_dir: Path) -> list[str]:
 
 
 async def send_request(
-    session: aiohttp.ClientSession,
-    payload: dict,
-    semaphore: asyncio.Semaphore,
-    request_id: int,
-    api_url: str,
-    api_key: str,
+        session: aiohttp.ClientSession,
+        payload: dict,
+        semaphore: asyncio.Semaphore,
+        request_id: int,
+        api_url: str,
+        api_key: str,
 ) -> tuple[bool, float, str, Optional[bool]]:
     """发送单个请求"""
     async with semaphore:
@@ -280,10 +287,10 @@ async def send_request(
                 "Content-Type": "application/json",
             }
             async with session.post(
-                api_url,
-                json=payload,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=120),
+                    api_url,
+                    json=payload,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=120),
             ) as resp:
                 response_text = await resp.text()
                 elapsed = time.time() - start_time
@@ -332,14 +339,14 @@ async def send_request(
 
 
 async def stress_test_single_image(
-    payload: dict,
-    api_url: str,
-    api_key: str,
-    model_name: str,
-    image_name: str,
-    total_requests: int = 10,
-    concurrency: int = 5,
-    expected_compliant: Optional[bool] = None,
+        payload: dict,
+        api_url: str,
+        api_key: str,
+        model_name: str,
+        image_name: str,
+        total_requests: int = 10,
+        concurrency: int = 5,
+        expected_compliant: Optional[bool] = None,
 ) -> StressTestResult:
     """对单张图片执行压测"""
 
