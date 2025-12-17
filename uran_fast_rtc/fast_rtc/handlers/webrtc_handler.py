@@ -25,7 +25,7 @@ from fastrtc import (
     wait_for_item,
 )
 
-from constants import (
+from ..constants import (
     StreamMode,
     MessageType,
     VideoCodec,
@@ -34,7 +34,7 @@ from constants import (
     AsyncTaskConstants,
 )
 
-from config import (
+from ..config import (
     record_audio_dir_path,
     video_frames_dir_path,
     video_recordings_dir_path,
@@ -59,6 +59,8 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
             output_frame_size,
             input_sample_rate=16000,
         )
+        self.start_time = None
+        self.connection_id = None
         self.video_queue = asyncio.Queue()
         self.audio_queue = asyncio.Queue()
 
@@ -163,8 +165,6 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
 
     async def _shutdown_async_workers(self):
         """优雅关闭所有异步工作任务"""
-        from constants import AsyncTaskConstants
-
         tasks_to_cancel = []
 
         # 收集需要取消的任务
@@ -195,7 +195,7 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
                     except asyncio.QueueEmpty:
                         break
 
-                return (self.sample_rate, audio_data)
+                return self.sample_rate, audio_data
             else:
                 # 回放结束
                 logger.info(f"回放结束，切换回 {StreamMode.LIVE.description} 模式")
@@ -298,7 +298,7 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
                 )
 
                 # 队列使用率警告
-                from constants import AsyncTaskConstants
+                from ..constants import AsyncTaskConstants
 
                 usage_rate = queue_size / AsyncTaskConstants.VIDEO_RECORDING_QUEUE_SIZE
                 if usage_rate > AsyncTaskConstants.QUEUE_WARNING_THRESHOLD:
@@ -308,7 +308,7 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
             except asyncio.QueueFull:
                 # 队列满了，丢弃帧并记录
                 self.stats["video_dropped_frames"] += 1
-                from constants import AsyncTaskConstants
+                from ..constants import AsyncTaskConstants
 
                 if (
                     self.stats["video_dropped_frames"]
@@ -433,7 +433,7 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
         filepath = os.path.join(record_audio_dir_path, filename)
 
         # 启动异步worker任务
-        from handlers.async_workers import AudioRecordingWorker
+        from ..handlers.async_workers import AudioRecordingWorker
 
         self.audio_recording_worker_task = asyncio.create_task(
             AudioRecordingWorker.run(
@@ -460,7 +460,7 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
             self.replay_index = 0
 
             # 2. 等待队列清空
-            from constants import AsyncTaskConstants
+            from ..constants import AsyncTaskConstants
 
             start_time = time.time()
             while not self.audio_recording_queue.empty():
@@ -545,7 +545,7 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
         self.frame_count = 0
 
         # 启动异步worker任务（消费者）
-        from handlers.async_workers import FrameSaveWorker
+        from ..handlers.async_workers import FrameSaveWorker
 
         self.frame_save_worker_task = asyncio.create_task(
             FrameSaveWorker.run(
@@ -678,7 +678,7 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
             self.recorded_video_frames = 0
 
             # ✨ 启动异步worker任务
-            from handlers.async_workers import VideoRecordingWorker
+            from ..handlers.async_workers import VideoRecordingWorker
 
             self.video_recording_worker_task = asyncio.create_task(
                 VideoRecordingWorker.run(
@@ -728,7 +728,7 @@ class UranEchoHandler(AsyncAudioVideoStreamHandler):
             self.video_recording_enabled = False
 
             # 2. 等待worker处理完队列中的帧（带超时）
-            from constants import AsyncTaskConstants
+            from ..constants import AsyncTaskConstants
 
             start_time = time.time()
             while not self.video_recording_queue.empty():
