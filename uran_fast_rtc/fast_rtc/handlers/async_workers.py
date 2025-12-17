@@ -200,6 +200,7 @@ class FrameSaveWorker:
         get_enabled_func,
         get_count_func,
         increment_count_func,
+        filepath: str
     ):
         """
         抽帧保存工作循环
@@ -210,6 +211,7 @@ class FrameSaveWorker:
             get_enabled_func: 获取是否还在抽帧的回调
             get_count_func: 获取当前帧count的回调
             increment_count_func: 递增count的回调
+            filepath: 抽帧数据存放路径
         """
         logger.info(f"[连接 {connection_id}] 抽帧保存worker已启动")
         saved_count = 0
@@ -227,6 +229,7 @@ class FrameSaveWorker:
                         frame,
                         get_count_func(),
                         connection_id,
+                        filepath
                     )
 
                     increment_count_func()
@@ -248,15 +251,18 @@ class FrameSaveWorker:
             raise
 
     @staticmethod
-    def _save_frame_sync(frame: np.ndarray, frame_number: int, connection_id: int):
+    def _save_frame_sync(frame: np.ndarray, frame_number: int, connection_id: int, filepath: str):
         """在独立线程中保存视频帧"""
         try:
-            # 移除颜色转换，假设输入已经是 RGB (或者让 PIL 处理)
-
+            # WebRTC/aiortc 传入的帧是 BGR 格式，PIL 期望 RGB 格式，需要转换
             if len(frame.shape) == 3 and frame.shape[2] == 4:
-                image = Image.fromarray(frame.astype("uint8"), mode="RGBA")
+                # BGRA -> RGBA
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGBA)
+                image = Image.fromarray(frame_rgb.astype("uint8"), mode="RGBA")
             elif len(frame.shape) == 3 and frame.shape[2] == 3:
-                image = Image.fromarray(frame.astype("uint8"), mode="RGB")
+                # BGR -> RGB
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                image = Image.fromarray(frame_rgb.astype("uint8"), mode="RGB")
             else:
                 image = Image.fromarray(frame.astype("uint8"), mode="L")
 

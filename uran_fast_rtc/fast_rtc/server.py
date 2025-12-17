@@ -45,10 +45,20 @@ def create_app() -> FastAPI:
     )
     
     # 初始化 WebRTC Stream
+    # track_constraints: 设置视频分辨率和帧率约束
+    # rtp_params: "maintain-resolution" 强制保持分辨率，防止 WebRTC 自动降低分辨率
+    track_constraints = {
+        "width": {"ideal": 1280, "max": 1920},
+        "height": {"ideal": 720, "max": 1080},
+        "frameRate": {"ideal": 30}
+    }
+    
     stream = Stream(
         handler=UranEchoHandler(),
         modality="audio-video",
         mode="send-receive",
+        track_constraints=track_constraints,
+        rtp_params={"degradationPreference": "maintain-resolution"},
     )
     
     # 挂载 WebRTC 路由
