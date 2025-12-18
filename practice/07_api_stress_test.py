@@ -38,6 +38,11 @@ MODELS_CONFIG = {
         "api_key": "93e5f02e99061db3b6113e8db46a0fbd",
         "model_name": "qwen3-vl-32b-instruct",
     },
+    "qwen3_vl_30b_a3b": {
+        "api_url": "http://192.168.2.54:9015/v1/chat/completions",
+        "api_key": "gw-cNG7EqGWyej6JRfwZbngDzkgtliZ0Sxc2UHgYjwd7Ts",
+        "model_name": "qwen3_vl_30b_a3b",
+    },
 }
 
 # 用户提示词模板
