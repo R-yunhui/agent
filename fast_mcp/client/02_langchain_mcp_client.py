@@ -6,12 +6,10 @@ import os
 import asyncio
 
 from dotenv import load_dotenv
-from langchain_classic.agents import create_tool_calling_agent
 from langchain_community.chat_models import ChatTongyi
 from langchain_core.runnables import RunnableConfig
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain.agents import create_agent
-from langchain_openai import ChatOpenAI
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import InMemorySaver
 
